@@ -8,6 +8,8 @@ st.write("Hola, soy Ignacio y esta es mi primera aplicación con Streamlit.")
 
 # Un input interactivo
 nombre = st.text_input("¿Cómo te llamas?")
+edad = st.number_input("¿Cuántos años tienes?", min_value=0, max_value=120)
+opcion = st.selectbox("Elige una opción", ["Hombre", "Mujer", "Prefiero no decirlo"])
 
 # Respuesta condicional
 if nombre:
