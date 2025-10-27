@@ -4,7 +4,7 @@ import streamlit as st
 st.title("¡Mi primera app!")
 
 # Texto simple
-st.write("Hola, soy [TU NOMBRE] y esta es mi primera aplicación con Streamlit.")
+st.write("Hola, soy Ignacio y esta es mi primera aplicación con Streamlit.")
 
 # Un input interactivo
 nombre = st.text_input("¿Cómo te llamas?")
