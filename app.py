@@ -18,4 +18,4 @@ if nombre:
 # Un botón
 if st.button("Presiona aquí"):
     st.balloons()  # Animación de globos
-    st.success("¡Funciona perfectamente!")
+    st.success("¡Registrado correctamente!")
