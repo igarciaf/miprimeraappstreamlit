@@ -17,5 +17,9 @@ if nombre:
 
 # Un botón
 if st.button("Presiona aquí"):
+    if not nombre.strip():  # Si no se ingresó nombre
+        st.error("❌ No puedes registrarte sin ingresar tu nombre.")
+    else:
     st.balloons()  # Animación de globos
     st.success("¡Registrado correctamente!")
+
