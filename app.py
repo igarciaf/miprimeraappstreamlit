@@ -16,10 +16,11 @@ if nombre:
     st.write(f"¡Hola, {nombre}! Bienvenido/a a mi app")
 
 # Un botón
+# Botón de registro
 if st.button("Presiona aquí"):
     if not nombre.strip():  # Si no se ingresó nombre
-        st.error("❌ No puedes registrarte sin ingresar tu nombre.")
+        st.error("No puedes registrarte sin ingresar tu nombre.")
     else:
-    st.balloons()  # Animación de globos
-    st.success("¡Registrado correctamente!")
+        st.balloons()  # Animación de globos
+        st.success("¡Registrado correctamente!")
 
