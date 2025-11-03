@@ -33,6 +33,24 @@ def volver(pagina):
         st.session_state.pagina = pagina
         st.rerun()
 
+# --- FUNCION PARA FOOTER TIPO INSTAGRAM ---
+def barra_inferior():
+    st.markdown("---")  # separador visual
+    col1, col2, col3 = st.columns([1,1,1])
+
+    with col1:  # izquierda - chats
+        if st.button("💬"):
+            st.session_state.pagina = "chats"
+            st.rerun()
+    with col2:  # centro - notificaciones
+        if st.button("🔔"):
+            st.session_state.pagina = "notificaciones"
+            st.rerun()
+    with col3:  # derecha - perfil
+        if st.button("👤"):
+            st.session_state.pagina = "perfil_usuario"
+            st.rerun()
+
 # --- PANTALLA INICIO ---
 if st.session_state.pagina == "inicio":
     st.title("🤝 Conecta")
@@ -60,6 +78,8 @@ if st.session_state.pagina == "inicio":
             st.session_state.categoria = "Niños"
             st.session_state.pagina = "subcategoria"
 
+    barra_inferior()
+
 # --- PANTALLA ACERCA DE ---
 elif st.session_state.pagina == "acerca":
     st.title("Acerca de Conecta")
@@ -70,6 +90,7 @@ elif st.session_state.pagina == "acerca":
     con otros usuarios de tu zona.
     """)
     volver("inicio")
+    barra_inferior()
 
 # --- PANTALLA SUBCATEGORÍAS SOLO LISTA DESPLEGABLE ---
 elif st.session_state.pagina == "subcategoria":
@@ -85,22 +106,20 @@ elif st.session_state.pagina == "subcategoria":
         "Niños": ["Cuidado por horas", "Apoyo escolar", "Actividades recreativas", "Acompañamiento", "Transporte escolar"]
     }
 
-    # Lista desplegable sin buscador
     seleccion = st.selectbox("Selecciona el servicio:", ["-- Elige una opción --"] + opciones[st.session_state.categoria])
     if seleccion != "-- Elige una opción --":
         st.session_state.servicio = seleccion
         st.session_state.pagina = "ubicacion"
         st.rerun()
 
+    barra_inferior()
+
 # --- PANTALLA UBICACIÓN (CIUDAD Y COMUNA) ---
 elif st.session_state.pagina == "ubicacion":
     st.title("📍 Selecciona tu ubicación")
     volver("subcategoria")
 
-    # Ciudad fija por ahora
     ciudad = st.selectbox("Ciudad:", ["Santiago"])
-    
-    # Comunas de Santiago
     comunas_santiago = [
         "Cerrillos", "Cerro Navia", "Conchalí", "El Bosque", "Estación Central",
         "Huechuraba", "Independencia", "La Cisterna", "La Florida", "La Granja",
@@ -120,12 +139,13 @@ elif st.session_state.pagina == "ubicacion":
             st.session_state.pagina = "resultados"
             st.rerun()
 
+    barra_inferior()
+
 # --- PANTALLA RESULTADOS ---
 elif st.session_state.pagina == "resultados":
     st.title(f"Resultados para '{st.session_state.servicio}' en {st.session_state.ubicacion}")
     volver("ubicacion")
 
-    # Lista simulada de resultados
     resultados = [
         {"nombre": "Juan Pérez", "servicio": st.session_state.servicio, "valoracion": "★★★★☆", "edad": 28},
         {"nombre": "María Gómez", "servicio": st.session_state.servicio, "valoracion": "★★★★★", "edad": 32},
@@ -138,6 +158,8 @@ elif st.session_state.pagina == "resultados":
             st.session_state.perfil_usuario = r
             st.session_state.pagina = "perfil"
             st.rerun()
+
+    barra_inferior()
 
 # --- PANTALLA PERFIL Y CHAT ---
 elif st.session_state.pagina == "perfil":
@@ -157,3 +179,26 @@ elif st.session_state.pagina == "perfil":
             st.success("Mensaje enviado correctamente ✅")
         else:
             st.warning("No puedes enviar un mensaje vacío.")
+
+    barra_inferior()
+
+# --- PANTALLA CHATS ---
+elif st.session_state.pagina == "chats":
+    st.title("💬 Chats")
+    volver("inicio")
+    st.write("Aquí estarán todos tus chats con usuarios.")
+    barra_inferior()
+
+# --- PANTALLA NOTIFICACIONES ---
+elif st.session_state.pagina == "notificaciones":
+    st.title("🔔 Notificaciones")
+    volver("inicio")
+    st.write("Aquí recibirás alertas cuando alguien vea tu perfil o deje una reseña.")
+    barra_inferior()
+
+# --- PANTALLA PERFIL PROPIO ---
+elif st.session_state.pagina == "perfil_usuario":
+    st.title("👤 Mi Perfil")
+    volver("inicio")
+    st.write("Aquí puedes editar tu perfil, ver tus valoraciones y trabajos realizados.")
+    barra_inferior()
