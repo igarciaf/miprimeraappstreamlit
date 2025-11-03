@@ -1,11 +1,12 @@
 import streamlit as st
 
 # --- CONFIGURACIÓN ---
-st.set_page_config(page_title="Conecta", page_icon="🤝", layout="centered")
+st.set_page_config(page_title="Conecta", page_icon="🤝", layout="wide")
 
 # --- ESTILO CSS PARA BOTONES UNIFORMES ---
 st.markdown("""
 <style>
+/* Botones grandes uniformes */
 div.stButton > button {
     height: 80px;
     width: 200px;
@@ -17,6 +18,30 @@ div.stButton > button {
 }
 div.stButton > button:hover {
     background-color: #45a049;
+}
+
+/* Footer fijo */
+.footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 70px;
+    background-color: #f1f1f1;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    border-top: 1px solid #ccc;
+    z-index: 100;
+}
+.footer button {
+    font-size: 28px;
+    background: none;
+    border: none;
+    cursor: pointer;
+}
+body {
+    margin-bottom: 90px; /* espacio para que el contenido no quede debajo del footer */
 }
 </style>
 """, unsafe_allow_html=True)
@@ -33,23 +58,28 @@ def volver(pagina):
         st.session_state.pagina = pagina
         st.rerun()
 
-# --- FUNCION PARA FOOTER TIPO INSTAGRAM ---
-def barra_inferior():
-    st.markdown("---")  # separador visual
-    col1, col2, col3 = st.columns([1,1,1])
+# --- FUNCION PARA FOOTER FIJO ---
+def footer_fijo():
+    st.markdown("""
+    <div class="footer">
+        <form method="post">
+            <button name="chats">💬</button>
+            <button name="notificaciones">🔔</button>
+            <button name="perfil">👤</button>
+        </form>
+    </div>
+    """, unsafe_allow_html=True)
 
-    with col1:  # izquierda - chats
-        if st.button("💬"):
-            st.session_state.pagina = "chats"
-            st.rerun()
-    with col2:  # centro - notificaciones
-        if st.button("🔔"):
-            st.session_state.pagina = "notificaciones"
-            st.rerun()
-    with col3:  # derecha - perfil
-        if st.button("👤"):
-            st.session_state.pagina = "perfil_usuario"
-            st.rerun()
+    # Captura clicks con session_state
+    if st.experimental_get_query_params().get("chats") or st.button("💬", key="chats"):
+        st.session_state.pagina = "chats"
+        st.rerun()
+    if st.experimental_get_query_params().get("notificaciones") or st.button("🔔", key="notificaciones"):
+        st.session_state.pagina = "notificaciones"
+        st.rerun()
+    if st.experimental_get_query_params().get("perfil") or st.button("👤", key="perfil"):
+        st.session_state.pagina = "perfil_usuario"
+        st.rerun()
 
 # --- PANTALLA INICIO ---
 if st.session_state.pagina == "inicio":
@@ -78,7 +108,7 @@ if st.session_state.pagina == "inicio":
             st.session_state.categoria = "Niños"
             st.session_state.pagina = "subcategoria"
 
-    barra_inferior()
+    footer_fijo()
 
 # --- PANTALLA ACERCA DE ---
 elif st.session_state.pagina == "acerca":
@@ -90,7 +120,7 @@ elif st.session_state.pagina == "acerca":
     con otros usuarios de tu zona.
     """)
     volver("inicio")
-    barra_inferior()
+    footer_fijo()
 
 # --- PANTALLA SUBCATEGORÍAS SOLO LISTA DESPLEGABLE ---
 elif st.session_state.pagina == "subcategoria":
@@ -98,7 +128,6 @@ elif st.session_state.pagina == "subcategoria":
     volver("inicio")
     st.write("Selecciona un tipo de servicio:")
 
-    # Diccionario de subcategorías
     opciones = {
         "Mascotas": ["Pasear perros", "Cuidar gatos", "Aseo de mascotas", "Adiestramiento", "Cuidado nocturno"],
         "Hogar": ["Limpieza general", "Cuidado de jardín", "Arreglo básico", "Electricidad", "Pintura", "Gasfitería"],
@@ -112,7 +141,7 @@ elif st.session_state.pagina == "subcategoria":
         st.session_state.pagina = "ubicacion"
         st.rerun()
 
-    barra_inferior()
+    footer_fijo()
 
 # --- PANTALLA UBICACIÓN (CIUDAD Y COMUNA) ---
 elif st.session_state.pagina == "ubicacion":
@@ -139,7 +168,7 @@ elif st.session_state.pagina == "ubicacion":
             st.session_state.pagina = "resultados"
             st.rerun()
 
-    barra_inferior()
+    footer_fijo()
 
 # --- PANTALLA RESULTADOS ---
 elif st.session_state.pagina == "resultados":
@@ -159,7 +188,7 @@ elif st.session_state.pagina == "resultados":
             st.session_state.pagina = "perfil"
             st.rerun()
 
-    barra_inferior()
+    footer_fijo()
 
 # --- PANTALLA PERFIL Y CHAT ---
 elif st.session_state.pagina == "perfil":
@@ -180,25 +209,25 @@ elif st.session_state.pagina == "perfil":
         else:
             st.warning("No puedes enviar un mensaje vacío.")
 
-    barra_inferior()
+    footer_fijo()
 
 # --- PANTALLA CHATS ---
 elif st.session_state.pagina == "chats":
     st.title("💬 Chats")
     volver("inicio")
     st.write("Aquí estarán todos tus chats con usuarios.")
-    barra_inferior()
+    footer_fijo()
 
 # --- PANTALLA NOTIFICACIONES ---
 elif st.session_state.pagina == "notificaciones":
     st.title("🔔 Notificaciones")
     volver("inicio")
     st.write("Aquí recibirás alertas cuando alguien vea tu perfil o deje una reseña.")
-    barra_inferior()
+    footer_fijo()
 
 # --- PANTALLA PERFIL PROPIO ---
 elif st.session_state.pagina == "perfil_usuario":
     st.title("👤 Mi Perfil")
     volver("inicio")
     st.write("Aquí puedes editar tu perfil, ver tus valoraciones y trabajos realizados.")
-    barra_inferior()
+    footer_fijo()
