@@ -71,12 +71,11 @@ elif st.session_state.pagina == "acerca":
     """)
     volver("inicio")
 
-# --- PANTALLA SUBCATEGORÍAS CON BUSCADOR Y SELECTBOX ---
+# --- PANTALLA SUBCATEGORÍAS SOLO LISTA DESPLEGABLE ---
 elif st.session_state.pagina == "subcategoria":
     st.title(f"Categoría: {st.session_state.categoria}")
     volver("inicio")
-
-    st.write("Selecciona un tipo de servicio específico o busca uno:")
+    st.write("Selecciona un tipo de servicio:")
 
     # Diccionario de subcategorías
     opciones = {
@@ -86,33 +85,38 @@ elif st.session_state.pagina == "subcategoria":
         "Niños": ["Cuidado por horas", "Apoyo escolar", "Actividades recreativas", "Acompañamiento", "Transporte escolar"]
     }
 
-    # Buscador
-    busqueda = st.text_input("🔍 Buscar servicio:")
-    subcategorias_filtradas = [s for s in opciones[st.session_state.categoria] if busqueda.lower() in s.lower()]
+    # Lista desplegable sin buscador
+    seleccion = st.selectbox("Selecciona el servicio:", ["-- Elige una opción --"] + opciones[st.session_state.categoria])
+    if seleccion != "-- Elige una opción --":
+        st.session_state.servicio = seleccion
+        st.session_state.pagina = "ubicacion"
+        st.rerun()
 
-    if not subcategorias_filtradas:
-        st.info("No se encontraron resultados para tu búsqueda.")
-    else:
-        # Selectbox desplegable
-        col1, col2, col3 = st.columns([1,2,1])
-        with col2:
-            seleccion = st.selectbox("Selecciona el servicio:", ["-- Elige una opción --"] + subcategorias_filtradas)
-            if seleccion != "-- Elige una opción --":
-                st.session_state.servicio = seleccion
-                st.session_state.pagina = "ubicacion"
-                st.rerun()
-
-# --- PANTALLA UBICACIÓN ---
+# --- PANTALLA UBICACIÓN (CIUDAD Y COMUNA) ---
 elif st.session_state.pagina == "ubicacion":
     st.title("📍 Selecciona tu ubicación")
     volver("subcategoria")
 
-    ubicacion = st.text_input("Ingresa tu comuna o ciudad:")
+    # Ciudad fija por ahora
+    ciudad = st.selectbox("Ciudad:", ["Santiago"])
+    
+    # Comunas de Santiago
+    comunas_santiago = [
+        "Cerrillos", "Cerro Navia", "Conchalí", "El Bosque", "Estación Central",
+        "Huechuraba", "Independencia", "La Cisterna", "La Florida", "La Granja",
+        "La Pintana", "La Reina", "Las Condes", "Lo Barnechea", "Lo Espejo",
+        "Lo Prado", "Macul", "Maipú", "Ñuñoa", "Pedro Aguirre Cerda", "Peñalolén",
+        "Providencia", "Pudahuel", "Quilicura", "Quinta Normal", "Recoleta",
+        "Renca", "San Joaquín", "San Miguel", "San Ramón", "Vitacura", "San Bernardo",
+        "Puente Alto", "Pirque", "San José de Maipo", "Colina", "Lampa", "Tiltil"
+    ]
+    comuna = st.selectbox("Comuna:", comunas_santiago)
+
     if st.button("Buscar resultados"):
-        if not ubicacion.strip():
-            st.error("Por favor ingresa una ubicación válida.")
+        if not ciudad or not comuna:
+            st.error("Por favor selecciona ciudad y comuna válidas.")
         else:
-            st.session_state.ubicacion = ubicacion
+            st.session_state.ubicacion = f"{comuna}, {ciudad}"
             st.session_state.pagina = "resultados"
             st.rerun()
 
