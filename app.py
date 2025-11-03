@@ -71,7 +71,7 @@ elif st.session_state.pagina == "acerca":
     """)
     volver("inicio")
 
-# --- PANTALLA SUBCATEGORÍAS CON BUSCADOR ---
+# --- PANTALLA SUBCATEGORÍAS CON BUSCADOR Y SELECTBOX ---
 elif st.session_state.pagina == "subcategoria":
     st.title(f"Categoría: {st.session_state.categoria}")
     volver("inicio")
@@ -93,15 +93,14 @@ elif st.session_state.pagina == "subcategoria":
     if not subcategorias_filtradas:
         st.info("No se encontraron resultados para tu búsqueda.")
     else:
-        # Mostrar en columnas uniformes
-        num_columnas = 2
-        for i in range(0, len(subcategorias_filtradas), num_columnas):
-            cols = st.columns(num_columnas)
-            for j, sub in enumerate(subcategorias_filtradas[i:i+num_columnas]):
-                if cols[j].button(sub):
-                    st.session_state.servicio = sub
-                    st.session_state.pagina = "ubicacion"
-                    st.rerun()
+        # Selectbox desplegable
+        col1, col2, col3 = st.columns([1,2,1])
+        with col2:
+            seleccion = st.selectbox("Selecciona el servicio:", ["-- Elige una opción --"] + subcategorias_filtradas)
+            if seleccion != "-- Elige una opción --":
+                st.session_state.servicio = seleccion
+                st.session_state.pagina = "ubicacion"
+                st.rerun()
 
 # --- PANTALLA UBICACIÓN ---
 elif st.session_state.pagina == "ubicacion":
