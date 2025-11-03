@@ -1,7 +1,25 @@
 import streamlit as st
 
-# --- CONFIGURACIÓN INICIAL ---
+# --- CONFIGURACIÓN ---
 st.set_page_config(page_title="Conecta", page_icon="🤝", layout="centered")
+
+# --- ESTILO CSS PARA BOTONES UNIFORMES ---
+st.markdown("""
+<style>
+div.stButton > button {
+    height: 80px;
+    width: 200px;
+    background-color: #4CAF50;
+    color: white;
+    border-radius: 12px;
+    font-size: 18px;
+    margin: 5px 10px;
+}
+div.stButton > button:hover {
+    background-color: #45a049;
+}
+</style>
+""", unsafe_allow_html=True)
 
 # --- ESTADO DE NAVEGACIÓN ---
 if "pagina" not in st.session_state:
@@ -9,7 +27,7 @@ if "pagina" not in st.session_state:
 if "categoria" not in st.session_state:
     st.session_state.categoria = None
 
-# --- FUNCIÓN PARA VOLVER ATRÁS ---
+# --- FUNCIONES AUXILIARES ---
 def volver(pagina):
     if st.button("⬅️ Volver"):
         st.session_state.pagina = pagina
@@ -30,7 +48,6 @@ if st.session_state.pagina == "inicio":
         if st.button("Cuidado de mascotas"):
             st.session_state.categoria = "Mascotas"
             st.session_state.pagina = "subcategoria"
-
         if st.button("Limpieza y hogar"):
             st.session_state.categoria = "Hogar"
             st.session_state.pagina = "subcategoria"
@@ -39,7 +56,6 @@ if st.session_state.pagina == "inicio":
         if st.button("Clases particulares"):
             st.session_state.categoria = "Clases"
             st.session_state.pagina = "subcategoria"
-
         if st.button("Cuidado de niños"):
             st.session_state.categoria = "Niños"
             st.session_state.pagina = "subcategoria"
@@ -55,24 +71,37 @@ elif st.session_state.pagina == "acerca":
     """)
     volver("inicio")
 
-# --- PANTALLA SUBCATEGORÍAS ---
+# --- PANTALLA SUBCATEGORÍAS CON BUSCADOR ---
 elif st.session_state.pagina == "subcategoria":
     st.title(f"Categoría: {st.session_state.categoria}")
     volver("inicio")
 
-    st.write("Selecciona un tipo de servicio específico:")
+    st.write("Selecciona un tipo de servicio específico o busca uno:")
+
+    # Diccionario de subcategorías
     opciones = {
-        "Mascotas": ["Pasear perros", "Cuidar gatos", "Aseo de mascotas"],
-        "Hogar": ["Limpieza general", "Cuidado de jardín", "Arreglo básico"],
-        "Clases": ["Matemáticas", "Inglés", "Música"],
-        "Niños": ["Cuidado por horas", "Apoyo escolar", "Actividades recreativas"]
+        "Mascotas": ["Pasear perros", "Cuidar gatos", "Aseo de mascotas", "Adiestramiento", "Cuidado nocturno"],
+        "Hogar": ["Limpieza general", "Cuidado de jardín", "Arreglo básico", "Electricidad", "Pintura", "Gasfitería"],
+        "Clases": ["Matemáticas", "Inglés", "Música", "Computación", "Arte", "Programación"],
+        "Niños": ["Cuidado por horas", "Apoyo escolar", "Actividades recreativas", "Acompañamiento", "Transporte escolar"]
     }
 
-    for opcion in opciones[st.session_state.categoria]:
-        if st.button(opcion):
-            st.session_state.servicio = opcion
-            st.session_state.pagina = "ubicacion"
-            st.rerun()
+    # Buscador
+    busqueda = st.text_input("🔍 Buscar servicio:")
+    subcategorias_filtradas = [s for s in opciones[st.session_state.categoria] if busqueda.lower() in s.lower()]
+
+    if not subcategorias_filtradas:
+        st.info("No se encontraron resultados para tu búsqueda.")
+    else:
+        # Mostrar en columnas uniformes
+        num_columnas = 2
+        for i in range(0, len(subcategorias_filtradas), num_columnas):
+            cols = st.columns(num_columnas)
+            for j, sub in enumerate(subcategorias_filtradas[i:i+num_columnas]):
+                if cols[j].button(sub):
+                    st.session_state.servicio = sub
+                    st.session_state.pagina = "ubicacion"
+                    st.rerun()
 
 # --- PANTALLA UBICACIÓN ---
 elif st.session_state.pagina == "ubicacion":
@@ -93,27 +122,34 @@ elif st.session_state.pagina == "resultados":
     st.title(f"Resultados para '{st.session_state.servicio}' en {st.session_state.ubicacion}")
     volver("ubicacion")
 
-    st.write("Aquí aparecería la lista de personas que ofrecen este servicio cerca de ti.")
-    st.info("Ejemplo: Juan Pérez - Paseador de perros 🐶 - ★★★★☆")
+    # Lista simulada de resultados
+    resultados = [
+        {"nombre": "Juan Pérez", "servicio": st.session_state.servicio, "valoracion": "★★★★☆", "edad": 28},
+        {"nombre": "María Gómez", "servicio": st.session_state.servicio, "valoracion": "★★★★★", "edad": 32},
+        {"nombre": "Pedro Ramírez", "servicio": st.session_state.servicio, "valoracion": "★★★☆☆", "edad": 24},
+    ]
 
-    if st.button("Ver perfil"):
-        st.session_state.pagina = "perfil"
-        st.rerun()
+    for r in resultados:
+        st.info(f"{r['nombre']} - {r['servicio']} - {r['valoracion']} - {r['edad']} años")
+        if st.button(f"Ver perfil de {r['nombre']}"):
+            st.session_state.perfil_usuario = r
+            st.session_state.pagina = "perfil"
+            st.rerun()
 
-# --- PANTALLA PERFIL ---
+# --- PANTALLA PERFIL Y CHAT ---
 elif st.session_state.pagina == "perfil":
-    st.title("👤 Perfil del oferente")
+    r = st.session_state.perfil_usuario
+    st.title(f"👤 Perfil de {r['nombre']}")
     volver("resultados")
 
-    st.write("**Nombre:** Juan Pérez")
-    st.write("**Edad:** 28 años")
-    st.write("**Servicio:** Paseador de perros")
-    st.write("**Valoración:** ⭐⭐⭐⭐☆ (4.5/5)")
-    st.write("**Descripción:** Amante de los animales, con 3 años de experiencia.")
+    st.write(f"**Edad:** {r['edad']} años")
+    st.write(f"**Servicio:** {r['servicio']}")
+    st.write(f"**Valoración:** {r['valoracion']}")
+    st.write("**Descripción:** Persona confiable, con experiencia en el servicio.")
 
-    st.subheader("💬 Chat con Juan")
+    st.subheader("💬 Chat")
     mensaje = st.text_input("Escribe un mensaje...")
-    if st.button("Enviar"):
+    if st.button("Enviar mensaje"):
         if mensaje.strip():
             st.success("Mensaje enviado correctamente ✅")
         else:
