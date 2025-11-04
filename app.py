@@ -1,3 +1,4 @@
+# app.py
 import streamlit as st
 
 # -------------------------
@@ -89,7 +90,11 @@ st.markdown(
         color: #333333;
         padding: 8px 16px;
         border-radius: 10px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
     }
+    .conecta-footer a div { font-size:11px; margin-top:4px; }
     .conecta-footer a:hover {
         background-color: rgba(0,0,0,0.03);
     }
@@ -138,31 +143,15 @@ def render_topbar():
 
 
 def render_footer():
-    """Renderiza el footer fijo como HTML + st.button fallback.
-       Footer HTML mantiene la estética; además ponemos botones Streamlit invisibles en columnas
-       para navegación instantánea si se desea (sin abrir pestañas)."""
-    # HTML footer (estético y fijo)
+    """Renderiza el footer fijo únicamente como HTML (sin botones ocultos)."""
     footer_html = """
     <div class="conecta-footer">
-        <a href="?pagina=chats" title="Chats">💬<div style="font-size:11px;">Chats</div></a>
-        <a href="?pagina=notificaciones" title="Notificaciones">🔔<div style="font-size:11px;">Notifs</div></a>
-        <a href="?pagina=perfil_usuario" title="Mi perfil">👤<div style="font-size:11px;">Perfil</div></a>
+        <a href="?pagina=chats" title="Chats">💬<div>Chats</div></a>
+        <a href="?pagina=notificaciones" title="Notificaciones">🔔<div>Notifs</div></a>
+        <a href="?pagina=perfil_usuario" title="Mi perfil">👤<div>Perfil</div></a>
     </div>
     """
     st.markdown(footer_html, unsafe_allow_html=True)
-
-    # Además colocamos tres botones invisibles (para navegar sin reload si el usuario prefiere),
-    # y evitar que el footer se comporte erráticamente en distintos navegadores.
-    cols = st.columns([1,1,1])
-    with cols[0]:
-        if st.button("", key="footer_chat_hidden"):
-            set_page("chats")
-    with cols[1]:
-        if st.button("", key="footer_notif_hidden"):
-            set_page("notificaciones")
-    with cols[2]:
-        if st.button("", key="footer_perfil_hidden"):
-            set_page("perfil_usuario")
 
 
 # -------------------------
@@ -283,7 +272,6 @@ elif st.session_state.pagina == "resultados":
     comuna_actual = st.session_state.get("ubicacion", "").split(",")[0]
     mostrados = [r for r in resultados if comuna_actual in r.get("comunas", [])]
     if not mostrados:
-        # removí la línea "No hay coincidencias..." a pedido
         mostrados = resultados
 
     for r in mostrados:
@@ -329,7 +317,7 @@ elif st.session_state.pagina == "chats":
 elif st.session_state.pagina == "notificaciones":
     st.markdown('<h1 class="conecta-title">🔔 Notificaciones</h1>', unsafe_allow_html=True)
     volver("inicio")
-    st.write("Aquí verás cuando alguien visite tu perfil o deje una valoración (simulación).")
+    st.write("Aquí verás cuando alguien visite tu perfil o deje una valoración (simulation).")
     render_footer()
 
 
