@@ -1,206 +1,333 @@
+# app.py
 import streamlit as st
 
-# Configuración inicial
-st.set_page_config(page_title="Conecta", page_icon="🤝", layout="centered")
+# -------------------------
+# CONFIGURACIÓN DE PÁGINA
+# -------------------------
+st.set_page_config(page_title="Conecta", page_icon="🤝", layout="wide")
 
-# Estado inicial
+# -------------------------
+# Si la URL trae ?pagina=... la respetamos (permite que el logo vuelva al inicio)
+# -------------------------
+query_params = st.experimental_get_query_params()
+if "pagina" in query_params:
+    st.session_state.pagina = query_params["pagina"][0]
+
+# -------------------------
+# ESTADOS POR DEFECTO
+# -------------------------
 if "pagina" not in st.session_state:
     st.session_state.pagina = "inicio"
+if "categoria" not in st.session_state:
+    st.session_state.categoria = None
+if "servicio" not in st.session_state:
+    st.session_state.servicio = None
+if "ubicacion" not in st.session_state:
+    st.session_state.ubicacion = None
+if "perfil_usuario" not in st.session_state:
+    st.session_state.perfil_usuario = None
 
-# --- FUNCIONES DE INTERFAZ ---
-
-def barra_superior():
-    st.markdown("""
+# -------------------------
+# CSS: botones uniformes + footer fijo + top bar fija
+# -------------------------
+st.markdown(
+    """
     <style>
+    /* -- botones grandes uniformes (los que crea Streamlit) -- */
+    div.stButton > button {
+        height: 76px;
+        width: 200px;
+        background-color: #2E8B57;
+        color: white;
+        border-radius: 12px;
+        font-size: 17px;
+        margin: 6px 8px;
+        border: none;
+    }
+    div.stButton > button:hover {
+        opacity: 0.95;
+        transform: translateY(-1px);
+    }
+
+    /* -- top bar fija (logo/nombre) -- */
     .top-bar {
         position: fixed;
         top: 0;
         left: 0;
         right: 0;
-        height: 60px;
-        background-color: white;
+        height: 64px;
+        background-color: #2E8B57;
+        color: white;
         display: flex;
-        justify-content: center;
         align-items: center;
-        border-bottom: 1px solid #ddd;
+        justify-content: center;
+        font-size: 22px;
+        font-weight: 700;
         z-index: 9999;
-        font-size: 24px;
-        font-weight: bold;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     }
-    .top-bar a {
-        text-decoration: none;
-        color: black;
-    }
-    .top-bar a:hover {
-        opacity: 0.8;
-        cursor: pointer;
-    }
-    .main-content {
-        margin-top: 80px;
-        margin-bottom: 80px;
-    }
-    </style>
-    <div class="top-bar">
-        <a href="#" onclick="window.location.reload()">🤝 Conecta</a>
-    </div>
-    """, unsafe_allow_html=True)
+    .top-bar a { color: white; text-decoration: none; padding: 8px 16px; }
+    .top-bar a:hover { opacity: 0.95; cursor: pointer; }
 
-def barra_inferior():
-    st.markdown("""
-    <style>
-    .bottom-bar {
+    /* -- footer fijo -- */
+    .conecta-footer {
         position: fixed;
         bottom: 0;
         left: 0;
         right: 0;
-        height: 65px;
-        background-color: white;
-        border-top: 1px solid #ddd;
+        height: 72px;
+        background-color: #ffffff;
         display: flex;
         justify-content: space-around;
         align-items: center;
+        border-top: 1px solid rgba(0,0,0,0.08);
         z-index: 9999;
+        box-shadow: 0 -4px 12px rgba(0,0,0,0.06);
     }
-    .bottom-icon {
-        font-size: 25px;
+    .conecta-footer a {
+        font-size: 26px;
         text-decoration: none;
-        color: black;
-        transition: transform 0.1s ease-in-out;
+        color: #333333;
+        padding: 8px 16px;
+        border-radius: 10px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
     }
-    .bottom-icon:hover {
-        transform: scale(1.1);
-        opacity: 0.8;
+    .conecta-footer a div { font-size:11px; margin-top:4px; }
+    .conecta-footer a:hover {
+        background-color: rgba(0,0,0,0.03);
+    }
+
+    /* dejar espacio para top bar y footer para que el contenido no quede tapado */
+    .main > div {
+        margin-top: 90px;
+        margin-bottom: 100px;
+    }
+
+    /* Opcional: estilo para títulos centrados */
+    .conecta-title {
+        text-align: center;
+        margin-bottom: 8px;
     }
     </style>
-    <div class="bottom-bar">
-        <a class="bottom-icon" href="?pagina=chats">💬</a>
-        <a class="bottom-icon" href="?pagina=notificaciones">🔔</a>
-        <a class="bottom-icon" href="?pagina=perfil">👤</a>
+    """,
+    unsafe_allow_html=True,
+)
+
+# -------------------------
+# HELPERS
+# -------------------------
+def set_page(pagina_name):
+    """Cambia la página en session_state y actualiza query param (opcional)."""
+    st.session_state.pagina = pagina_name
+    # actualizamos query param para que el logo (que usa ?pagina=inicio) funcione coherente
+    st.experimental_set_query_params(pagina=pagina_name)
+    st.rerun()
+
+
+def volver(pagina_destino="inicio"):
+    """Botón volver (usa st.button normal)"""
+    if st.button("⬅️ Volver"):
+        set_page(pagina_destino)
+
+
+def render_topbar():
+    """Barra superior fija con el nombre de la app. Al hacer clic va a ?pagina=inicio"""
+    top_html = """
+    <div class="top-bar">
+        <a href="?pagina=inicio">ConectaServicios</a>
     </div>
-    """, unsafe_allow_html=True)
+    """
+    st.markdown(top_html, unsafe_allow_html=True)
 
-# --- PANTALLAS ---
 
-def pantalla_inicio():
-    st.markdown("<div class='main-content'>", unsafe_allow_html=True)
-    st.title("Encuentra o publica servicios")
-    st.write("Selecciona una opción para comenzar:")
+def render_footer():
+    """Renderiza el footer fijo únicamente como HTML (sin botones ocultos)."""
+    footer_html = """
+    <div class="conecta-footer">
+        <a href="?pagina=chats" title="Chats">💬<div>Chats</div></a>
+        <a href="?pagina=notificaciones" title="Notificaciones">🔔<div>Notifs</div></a>
+        <a href="?pagina=perfil_usuario" title="Mi perfil">👤<div>Perfil</div></a>
+    </div>
+    """
+    st.markdown(footer_html, unsafe_allow_html=True)
 
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("Buscar servicios"):
-            st.session_state.pagina = "buscador"
-    with col2:
-        if st.button("Ofrecer servicios"):
-            st.session_state.pagina = "buscador"
 
-    st.markdown("</div>", unsafe_allow_html=True)
+# -------------------------
+# RENDER TOPBAR
+# -------------------------
+render_topbar()
 
-def pantalla_buscador():
-    st.markdown("<div class='main-content'>", unsafe_allow_html=True)
-    st.title("Selecciona una categoría")
+# -------------------------
+# PANTALLAS
+# -------------------------
 
-    with st.expander("Abrir lista de servicios disponibles"):
-        opciones = ["Cuidado de niños", "Paseo de perros", "Limpieza", "Electricista", "Jardinería"]
-        seleccion = st.radio("Elige una opción:", opciones)
-        if seleccion:
-            st.write(f"Has seleccionado **{seleccion}**")
+# ---------- INICIO ----------
+if st.session_state.pagina == "inicio":
+    st.markdown('<h1 class="conecta-title">🤝 Conecta</h1>', unsafe_allow_html=True)
+    st.write("Encuentra personas que ofrecen los servicios que necesitas.")
 
-    if st.button("Siguiente"):
-        st.session_state.pagina = "ubicacion"
+    if st.button("Acerca de"):
+        set_page("acerca")
 
-    if st.button("Volver al inicio"):
-        st.session_state.pagina = "inicio"
+    st.subheader("Selecciona una categoría:")
+    c1, c2 = st.columns(2)
 
-    st.markdown("</div>", unsafe_allow_html=True)
+    with c1:
+        if st.button("Cuidado de mascotas"):
+            st.session_state.categoria = "Mascotas"
+            set_page("subcategoria")
+        if st.button("Limpieza y hogar"):
+            st.session_state.categoria = "Hogar"
+            set_page("subcategoria")
 
-def pantalla_ubicacion():
-    st.markdown("<div class='main-content'>", unsafe_allow_html=True)
-    st.title("Selecciona tu ubicación")
+    with c2:
+        if st.button("Clases particulares"):
+            st.session_state.categoria = "Clases"
+            set_page("subcategoria")
+        if st.button("Cuidado de niños"):
+            st.session_state.categoria = "Niños"
+            set_page("subcategoria")
 
-    ciudades = ["Santiago"]
-    comunas = [
-        "Las Condes", "Providencia", "Ñuñoa", "La Florida", "Puente Alto", "Maipú", 
-        "Recoleta", "Santiago Centro", "Vitacura", "Peñalolén"
+    st.markdown("---")
+    st.write("Consejo: usa la barra inferior para acceder rápidamente a Chats, Notificaciones o a tu Perfil.")
+    render_footer()
+
+
+# ---------- ACERCA ----------
+elif st.session_state.pagina == "acerca":
+    st.markdown('<h1 class="conecta-title">Acerca de Conecta</h1>', unsafe_allow_html=True)
+    st.write(
+        """
+        **Conecta** es una app pensada para unir a personas que buscan servicios
+        con quienes los ofrecen.  
+        Puedes crear tu perfil, mostrar trabajos previos y contactar directamente.
+        """
+    )
+    volver("inicio")
+    render_footer()
+
+
+# ---------- SUBCATEGORIAS (selectbox) ----------
+elif st.session_state.pagina == "subcategoria":
+    st.markdown(f'<h1 class="conecta-title">Categoría: {st.session_state.categoria}</h1>', unsafe_allow_html=True)
+    volver("inicio")
+    st.write("Selecciona un tipo de servicio:")
+
+    opciones = {
+        "Mascotas": ["Pasear perros", "Cuidar gatos", "Aseo de mascotas", "Adiestramiento", "Cuidado nocturno"],
+        "Hogar": ["Limpieza general", "Cuidado de jardín", "Arreglo básico", "Electricidad", "Pintura", "Gasfitería"],
+        "Clases": ["Matemáticas", "Inglés", "Música", "Computación", "Arte", "Programación"],
+        "Niños": ["Cuidado por horas", "Apoyo escolar", "Actividades recreativas", "Acompañamiento", "Transporte escolar"]
+    }
+
+    seleccion = st.selectbox("Selecciona el servicio:", ["-- Elige una opción --"] + opciones.get(st.session_state.categoria, []))
+    if seleccion != "-- Elige una opción --":
+        st.session_state.servicio = seleccion
+        set_page("ubicacion")
+
+    render_footer()
+
+
+# ---------- UBICACIÓN (Ciudad + Comuna) ----------
+elif st.session_state.pagina == "ubicacion":
+    st.markdown('<h1 class="conecta-title">📍 Selecciona tu ubicación</h1>', unsafe_allow_html=True)
+    volver("subcategoria")
+
+    ciudad = st.selectbox("Ciudad:", ["Santiago"])
+    comunas_santiago = [
+        "Cerrillos", "Cerro Navia", "Conchalí", "El Bosque", "Estación Central",
+        "Huechuraba", "Independencia", "La Cisterna", "La Florida", "La Granja",
+        "La Pintana", "La Reina", "Las Condes", "Lo Barnechea", "Lo Espejo",
+        "Lo Prado", "Macul", "Maipú", "Ñuñoa", "Pedro Aguirre Cerda", "Peñalolén",
+        "Providencia", "Pudahuel", "Quilicura", "Quinta Normal", "Recoleta",
+        "Renca", "San Joaquín", "San Miguel", "San Ramón", "Vitacura", "San Bernardo",
+        "Puente Alto", "Pirque", "San José de Maipo", "Colina", "Lampa", "Tiltil"
     ]
+    comuna = st.selectbox("Comuna:", comunas_santiago)
 
-    ciudad = st.selectbox("Ciudad:", ciudades)
-    comuna = st.selectbox("Comuna:", comunas)
+    if st.button("Buscar resultados"):
+        if not ciudad or not comuna:
+            st.error("Por favor selecciona ciudad y comuna válidas.")
+        else:
+            st.session_state.ubicacion = f"{comuna}, {ciudad}"
+            set_page("resultados")
 
-    if st.button("Ver resultados"):
-        st.session_state.pagina = "resultados"
+    render_footer()
 
-    if st.button("Volver"):
-        st.session_state.pagina = "buscador"
 
-    st.markdown("</div>", unsafe_allow_html=True)
+# ---------- RESULTADOS ----------
+elif st.session_state.pagina == "resultados":
+    st.markdown(f'<h1 class="conecta-title">Resultados: {st.session_state.servicio} — {st.session_state.ubicacion}</h1>', unsafe_allow_html=True)
+    volver("ubicacion")
 
-def pantalla_resultados():
-    st.markdown("<div class='main-content'>", unsafe_allow_html=True)
-    st.title("Resultados encontrados")
-
+    # lista simulada (cada oferente tiene lista de comunas donde trabaja)
     resultados = [
-        {"nombre": "María López", "servicio": "Paseo de perros", "valoración": 4.8},
-        {"nombre": "Carlos Pérez", "servicio": "Electricista", "valoración": 4.5},
-        {"nombre": "Ana Torres", "servicio": "Limpieza", "valoración": 4.9},
+        {"nombre": "Juan Pérez", "servicio": st.session_state.servicio, "valoracion": "★★★★☆", "edad": 28, "comunas": ["Providencia", "Ñuñoa"]},
+        {"nombre": "María Gómez", "servicio": st.session_state.servicio, "valoracion": "★★★★★", "edad": 32, "comunas": ["Las Condes", "Providencia"]},
+        {"nombre": "Pedro Ramírez", "servicio": st.session_state.servicio, "valoracion": "★★★☆☆", "edad": 24, "comunas": ["Maipú", "Santiago"]},
     ]
 
-    for r in resultados:
-        st.markdown(f"**{r['nombre']}** — {r['servicio']} ⭐ {r['valoración']}")
+    comuna_actual = st.session_state.get("ubicacion", "").split(",")[0]
+    mostrados = [r for r in resultados if comuna_actual in r.get("comunas", [])]
+    if not mostrados:
+        mostrados = resultados
 
-    if st.button("Volver"):
-        st.session_state.pagina = "ubicacion"
+    for r in mostrados:
+        st.info(f"{r['nombre']}  —  {r['servicio']}  —  {r['valoracion']}  —  {r['edad']} años")
+        if st.button(f"Ver perfil de {r['nombre']}"):
+            st.session_state.perfil_usuario = r
+            set_page("perfil")
 
-    st.markdown("</div>", unsafe_allow_html=True)
+    render_footer()
 
-def pantalla_chats():
-    st.markdown("<div class='main-content'>", unsafe_allow_html=True)
-    st.title("💬 Chats")
-    st.write("Aquí verás tus conversaciones.")
-    if st.button("Volver al inicio"):
-        st.session_state.pagina = "inicio"
-    st.markdown("</div>", unsafe_allow_html=True)
 
-def pantalla_notificaciones():
-    st.markdown("<div class='main-content'>", unsafe_allow_html=True)
-    st.title("🔔 Notificaciones")
-    st.write("Aquí recibirás tus notificaciones.")
-    if st.button("Volver al inicio"):
-        st.session_state.pagina = "inicio"
-    st.markdown("</div>", unsafe_allow_html=True)
+# ---------- PERFIL DE OTRO USUARIO ----------
+elif st.session_state.pagina == "perfil":
+    r = st.session_state.perfil_usuario or {"nombre": "Usuario", "edad": "-", "servicio": "-", "valoracion": "—"}
+    st.markdown(f'<h1 class="conecta-title">👤 Perfil de {r["nombre"]}</h1>', unsafe_allow_html=True)
+    volver("resultados")
 
-def pantalla_perfil():
-    st.markdown("<div class='main-content'>", unsafe_allow_html=True)
-    st.title("👤 Perfil")
-    st.write("Aquí podrás ver y editar tu información.")
-    if st.button("Volver al inicio"):
-        st.session_state.pagina = "inicio"
-    st.markdown("</div>", unsafe_allow_html=True)
+    st.write(f"**Edad:** {r.get('edad','-')} años")
+    st.write(f"**Servicio:** {r.get('servicio','-')}")
+    st.write(f"**Valoración:** {r.get('valoracion','-')}")
+    st.write("**Descripción:** Persona confiable, con experiencia en el servicio (simulación).")
 
-# --- NAVEGACIÓN ---
+    st.subheader("💬 Chat")
+    mensaje = st.text_input("Escribe un mensaje...")
+    if st.button("Enviar mensaje"):
+        if mensaje.strip():
+            st.success("Mensaje enviado correctamente ✅")
+        else:
+            st.warning("No puedes enviar un mensaje vacío.")
 
-barra_superior()
+    render_footer()
 
-pagina = st.session_state.pagina
 
-if "pagina" in st.query_params:
-    pagina = st.query_params["pagina"]
+# ---------- CHATS (desde footer) ----------
+elif st.session_state.pagina == "chats":
+    st.markdown('<h1 class="conecta-title">💬 Chats</h1>', unsafe_allow_html=True)
+    volver("inicio")
+    st.write("Aquí estarán tus conversaciones (simulación).")
+    render_footer()
 
-if pagina == "inicio":
-    pantalla_inicio()
-elif pagina == "buscador":
-    pantalla_buscador()
-elif pagina == "ubicacion":
-    pantalla_ubicacion()
-elif pagina == "resultados":
-    pantalla_resultados()
-elif pagina == "chats":
-    pantalla_chats()
-elif pagina == "notificaciones":
-    pantalla_notificaciones()
-elif pagina == "perfil":
-    pantalla_perfil()
-else:
-    pantalla_inicio()
 
-barra_inferior()
+# ---------- NOTIFICACIONES (desde footer) ----------
+elif st.session_state.pagina == "notificaciones":
+    st.markdown('<h1 class="conecta-title">🔔 Notificaciones</h1>', unsafe_allow_html=True)
+    volver("inicio")
+    st.write("Aquí verás cuando alguien visite tu perfil o deje una valoración (simulation).")
+    render_footer()
+
+
+# ---------- PERFIL PROPIO (desde footer) ----------
+elif st.session_state.pagina == "perfil_usuario":
+    st.markdown('<h1 class="conecta-title">👤 Mi Perfil</h1>', unsafe_allow_html=True)
+    volver("inicio")
+    st.write("Aquí puedes ver y editar tu información (simulación).")
+    # ejemplo de datos propios
+    st.write("**Nombre:** Ignacio")
+    st.write("**Edad:**  XX")
+    st.write("**Servicios ofrecidos:** Paseo de perros, Cuidado por horas (ejemplo)")
+    render_footer()
