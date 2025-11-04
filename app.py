@@ -1,10 +1,19 @@
 import streamlit as st
 
-# Configuración general
-st.set_page_config(page_title="Conecta", layout="wide")
+# Configuración inicial de la app
+st.set_page_config(page_title="Conecta", page_icon="🤝", layout="centered")
 
-# ---- CSS para la barra superior e inferior ----
-st.markdown("""
+# Inicializar el estado de navegación
+if "pagina" not in st.session_state:
+    st.session_state.pagina = "inicio"
+
+# -------------------------------
+# FUNCIONES DE INTERFAZ
+# -------------------------------
+
+def render_topbar():
+    """Barra superior fija con el nombre de la app (texto). Al hacer clic va al inicio."""
+    top_html = """
     <style>
     /* Barra superior fija */
     .top-bar {
@@ -12,160 +21,163 @@ st.markdown("""
         top: 0;
         left: 0;
         right: 0;
-        height: 60px;
+        height: 64px;
         background-color: white;
-        border-bottom: 1px solid #ddd;
         display: flex;
         align-items: center;
         justify-content: center;
-        z-index: 1000;
+        font-size: 22px;
+        font-weight: 700;
+        z-index: 9999;
+        border-bottom: 1px solid #ddd;
     }
-    .top-bar button {
-        background: none;
-        border: none;
-        font-size: 28px;
-        font-weight: bold;
-        color: #333;
+    .top-bar a {
+        color: inherit;
+        text-decoration: none;
+        padding: 8px 12px;
+    }
+    .top-bar a:hover {
+        opacity: 0.8;
         cursor: pointer;
     }
-    .top-bar button:hover {
-        color: #0078ff;
-    }
-
-    /* Contenido principal */
+    /* Ajuste del contenido para que no quede debajo */
     .main-content {
-        padding-top: 80px;
-        padding-bottom: 80px;
+        margin-top: 80px;
+        margin-bottom: 80px;
     }
+    </style>
 
-    /* Barra inferior */
+    <div class="top-bar">
+        <a href="?pagina=inicio">🤝 Conecta</a>
+    </div>
+    """
+    st.markdown(top_html, unsafe_allow_html=True)
+
+
+def render_bottombar():
+    """Barra inferior fija con los íconos de navegación."""
+    bottom_html = """
+    <style>
+    /* Barra inferior fija */
     .bottom-bar {
         position: fixed;
         bottom: 0;
         left: 0;
         right: 0;
-        height: 60px;
+        height: 65px;
         background-color: white;
         border-top: 1px solid #ddd;
         display: flex;
-        justify-content: space-around;
         align-items: center;
-        z-index: 1000;
+        justify-content: space-around;
+        z-index: 9999;
     }
-    .bottom-bar button {
-        background: none;
-        border: none;
-        font-size: 18px;
-        color: #555;
-        cursor: pointer;
+    .bottom-icon {
+        font-size: 24px;
+        text-decoration: none;
+        color: black;
+        transition: transform 0.1s ease-in-out;
     }
-    .bottom-bar button:hover {
-        color: #0078ff;
+    .bottom-icon:hover {
+        transform: scale(1.1);
+        opacity: 0.8;
     }
     </style>
-""", unsafe_allow_html=True)
 
-
-# ---- Estado inicial ----
-if "page" not in st.session_state:
-    st.session_state.page = "home"
-
-def go_to(page):
-    st.session_state.page = page
-
-
-# ---- Barra superior (nombre como botón) ----
-st.markdown("""
-<div class="top-bar">
-    <form action="#" method="get">
-        <button name="home" type="submit" onclick="window.parent.postMessage({type: 'streamlit_setComponentValue', value: 'home'}, '*');">🤝 Conecta</button>
-    </form>
-</div>
-""", unsafe_allow_html=True)
-
-
-# ---- Contenido principal ----
-st.markdown('<div class="main-content">', unsafe_allow_html=True)
-
-if st.session_state.page == "home":
-    st.subheader("¿Qué servicio estás buscando?")
-    col1, col2 = st.columns(2)
-
-    with col1:
-        if st.button("Cuidado de mascotas", use_container_width=True):
-            go_to("categorias")
-        if st.button("Cuidado de niños", use_container_width=True):
-            go_to("categorias")
-        if st.button("Limpieza", use_container_width=True):
-            go_to("categorias")
-
-    with col2:
-        if st.button("Electricidad", use_container_width=True):
-            go_to("categorias")
-        if st.button("Plomería", use_container_width=True):
-            go_to("categorias")
-        if st.button("Otros servicios", use_container_width=True):
-            go_to("categorias")
-
-elif st.session_state.page == "categorias":
-    st.subheader("Selecciona el tipo de trabajo específico:")
-    opciones = ["Pasear perros", "Cuidar gatos", "Entrenador", "Veterinario", "Peluquero de mascotas"]
-    seleccion = st.selectbox("Selecciona una opción:", opciones)
-    if st.button("Continuar"):
-        go_to("ubicacion")
-
-elif st.session_state.page == "ubicacion":
-    st.subheader("Selecciona tu ubicación")
-
-    ciudad = st.selectbox("Ciudad", ["Santiago"])
-    comuna = st.selectbox("Comuna", [
-        "Cerrillos", "Cerro Navia", "Conchalí", "El Bosque", "Estación Central", "Huechuraba",
-        "Independencia", "La Cisterna", "La Florida", "La Granja", "La Pintana", "La Reina",
-        "Las Condes", "Lo Barnechea", "Lo Espejo", "Lo Prado", "Macul", "Maipú",
-        "Ñuñoa", "Pedro Aguirre Cerda", "Peñalolén", "Providencia", "Pudahuel",
-        "Quilicura", "Quinta Normal", "Recoleta", "Renca", "San Joaquín", "San Miguel",
-        "San Ramón", "Santiago Centro", "Vitacura"
-    ])
-    if st.button("Buscar resultados"):
-        go_to("resultados")
-
-elif st.session_state.page == "resultados":
-    st.subheader("Resultados en tu zona")
-    st.write("• Juan Pérez — Paseador de perros (⭐ 4.8)")
-    st.write("• María López — Cuidadora de mascotas (⭐ 4.9)")
-    st.write("• Carlos Díaz — Entrenador canino (⭐ 4.7)")
-
-elif st.session_state.page == "chats":
-    st.subheader("Chats")
-    st.write("Aquí podrás comunicarte con las personas con las que coordinas servicios.")
-
-elif st.session_state.page == "notificaciones":
-    st.subheader("Notificaciones")
-    st.write("Aquí verás cuando alguien se interese en tu perfil o te deje una valoración.")
-
-elif st.session_state.page == "perfil":
-    st.subheader("Tu perfil")
-    st.write("Aquí podrás editar tu perfil, agregar trabajos previos y ver tus valoraciones.")
-
-st.markdown('</div>', unsafe_allow_html=True)
-
-
-# ---- Barra inferior ----
-st.markdown(f"""
     <div class="bottom-bar">
-        <button onclick="window.parent.postMessage({{type: 'streamlit_setComponentValue', value: 'chats'}}, '*');">💬 Chats</button>
-        <button onclick="window.parent.postMessage({{type: 'streamlit_setComponentValue', value: 'notificaciones'}}, '*');">🔔 Notificaciones</button>
-        <button onclick="window.parent.postMessage({{type: 'streamlit_setComponentValue', value: 'perfil'}}, '*');">👤 Perfil</button>
+        <a class="bottom-icon" href="?pagina=chats">💬</a>
+        <a class="bottom-icon" href="?pagina=notificaciones">🔔</a>
+        <a class="bottom-icon" href="?pagina=perfil">👤</a>
     </div>
-""", unsafe_allow_html=True)
+    """
+    st.markdown(bottom_html, unsafe_allow_html=True)
 
-# ---- Detección de clics ----
-event = st.session_state.get("_component_value", None)
-if event == "chats":
-    go_to("chats")
-elif event == "notificaciones":
-    go_to("notificaciones")
-elif event == "perfil":
-    go_to("perfil")
-elif event == "home":
-    go_to("home")
+
+# -------------------------------
+# PANTALLAS
+# -------------------------------
+
+def pantalla_inicio():
+    st.markdown("<div class='main-content'>", unsafe_allow_html=True)
+    st.title("Encuentra o publica servicios")
+
+    # Simulación del buscador
+    comuna = st.text_input("Busca servicios en tu comuna:", "")
+    if comuna:
+        st.write(f"Mostrando resultados para **{comuna}**...")
+
+    # Botones de ejemplo para acceder a otras secciones
+    if st.button("Ver categorías disponibles"):
+        st.session_state.pagina = "buscador"
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+def pantalla_buscador():
+    st.markdown("<div class='main-content'>", unsafe_allow_html=True)
+    st.title("Selecciona una categoría")
+
+    opciones = ["Cuidado de niños", "Paseo de perros", "Limpieza", "Electricista", "Jardinería"]
+    seleccion = st.selectbox("Filtra servicios", opciones)
+
+    if seleccion:
+        st.write(f"Mostrando personas que ofrecen **{seleccion}** en tu zona.")
+    if st.button("Volver al inicio"):
+        st.session_state.pagina = "inicio"
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+def pantalla_chats():
+    st.markdown("<div class='main-content'>", unsafe_allow_html=True)
+    st.title("💬 Tus chats")
+    st.write("Aquí verás tus conversaciones con personas que ofrecen o buscan servicios.")
+    if st.button("Volver al inicio"):
+        st.session_state.pagina = "inicio"
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+def pantalla_notificaciones():
+    st.markdown("<div class='main-content'>", unsafe_allow_html=True)
+    st.title("🔔 Notificaciones")
+    st.write("Aquí recibirás avisos cuando alguien vea tu perfil o te deje una reseña.")
+    if st.button("Volver al inicio"):
+        st.session_state.pagina = "inicio"
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+def pantalla_perfil():
+    st.markdown("<div class='main-content'>", unsafe_allow_html=True)
+    st.title("👤 Tu perfil")
+    st.write("Aquí podrás editar tu información, ver tus trabajos y tus valoraciones.")
+    if st.button("Volver al inicio"):
+        st.session_state.pagina = "inicio"
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+# -------------------------------
+# RENDER PRINCIPAL
+# -------------------------------
+
+render_topbar()
+
+pagina_actual = st.session_state.pagina
+
+if "pagina" in st.query_params:
+    pagina_actual = st.query_params["pagina"]
+
+# Render según la página actual
+if pagina_actual == "inicio":
+    pantalla_inicio()
+elif pagina_actual == "buscador":
+    pantalla_buscador()
+elif pagina_actual == "chats":
+    pantalla_chats()
+elif pagina_actual == "notificaciones":
+    pantalla_notificaciones()
+elif pagina_actual == "perfil":
+    pantalla_perfil()
+else:
+    pantalla_inicio()
+
+render_bottombar()
