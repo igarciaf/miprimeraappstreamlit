@@ -7,7 +7,7 @@ import streamlit as st
 st.set_page_config(page_title="Conecta", page_icon="🤝", layout="wide")
 
 # -------------------------
-# Si la URL trae ?pagina=... la respetamos (permite que el logo vuelva al inicio)
+# Si la URL trae ?pagina=... la respetamos
 # -------------------------
 query_params = st.experimental_get_query_params()
 if "pagina" in query_params:
@@ -28,9 +28,7 @@ if "perfil_usuario" not in st.session_state:
     st.session_state.perfil_usuario = None
 if "notificaciones" not in st.session_state:
     st.session_state.notificaciones = [
-        {"tipo": "mensaje", "texto": "Tienes un nuevo mensaje de María.", "leida": False},
-        {"tipo": "reseña", "texto": "Pedro te dejó una reseña de 5 estrellas ⭐️⭐️⭐️⭐️⭐️.", "leida": False},
-        {"tipo": "vista", "texto": "Juan visitó tu perfil.", "leida": True},
+        {"tipo": "sistema", "texto": "Bienvenido a Conecta 👋", "leida": True},
     ]
 if "chats" not in st.session_state:
     st.session_state.chats = {
@@ -93,7 +91,7 @@ st.markdown(
 )
 
 # -------------------------
-# FUNCIONES BÁSICAS
+# FUNCIONES
 # -------------------------
 def set_page(pagina_name):
     st.session_state.pagina = pagina_name
@@ -114,6 +112,10 @@ def render_footer():
         <a href="?pagina=notificaciones">🔔<div>Notifs</div></a>
         <a href="?pagina=perfil_usuario">👤<div>Perfil</div></a>
     </div>""", unsafe_allow_html=True)
+
+def agregar_notificacion(texto, tipo="mensaje"):
+    """Agrega una notificación nueva al estado."""
+    st.session_state.notificaciones.insert(0, {"tipo": tipo, "texto": texto, "leida": False})
 
 # -------------------------
 # TOPBAR
@@ -199,7 +201,7 @@ elif st.session_state.pagina == "resultados":
             set_page("perfil")
     render_footer()
 
-# ---------- PERFIL DE OTRO USUARIO ----------
+# ---------- PERFIL OTRO USUARIO ----------
 elif st.session_state.pagina == "perfil":
     r = st.session_state.perfil_usuario
     st.markdown(f'<h1 class="conecta-title">👤 Perfil de {r["nombre"]}</h1>', unsafe_allow_html=True)
@@ -207,9 +209,11 @@ elif st.session_state.pagina == "perfil":
     st.write(f"**Edad:** {r['edad']} años")
     st.write(f"**Servicio:** {r['servicio']}")
     st.write(f"**Valoración:** {r['valoracion']}")
-    st.text_input("💬 Envía un mensaje:", key="msg")
+    mensaje = st.text_input("💬 Envía un mensaje:")
     if st.button("Enviar mensaje"):
-        st.success("Mensaje enviado ✅")
+        if mensaje.strip():
+            agregar_notificacion(f"Nuevo mensaje enviado a {r['nombre']}: '{mensaje}'", tipo="mensaje")
+            st.success("Mensaje enviado ✅")
     render_footer()
 
 # ---------- 🔔 NOTIFICACIONES ----------
@@ -246,7 +250,8 @@ elif st.session_state.pagina == "chats":
         nuevo = st.text_input("Escribe tu mensaje:")
         if st.button("Enviar"):
             if nuevo.strip():
-                chats[seleccion].append(nuevo)
+                chats[seleccion].append(f"Tú: {nuevo}")
+                agregar_notificacion(f"{seleccion} ha recibido tu mensaje: '{nuevo}'", tipo="mensaje")
                 st.success("Mensaje enviado ✅")
                 st.rerun()
     render_footer()
@@ -261,27 +266,4 @@ elif st.session_state.pagina == "perfil_usuario":
     st.write(f"**Descripción:** {perfil['descripcion']}")
     st.write(f"**Servicios ofrecidos:** {', '.join(perfil['servicios'])}")
     st.write(f"**Valoración promedio:** {perfil['valoracion']}")
-    if st.button("✏️ Editar perfil"):
-        set_page("editar_perfil")
-    render_footer()
-
-# ---------- EDITAR PERFIL ----------
-elif st.session_state.pagina == "editar_perfil":
-    st.markdown('<h1 class="conecta-title">✏️ Editar perfil</h1>', unsafe_allow_html=True)
-    volver("perfil_usuario")
-    perfil = st.session_state.perfil_propio
-    nombre = st.text_input("Nombre:", perfil["nombre"])
-    edad = st.text_input("Edad:", perfil["edad"])
-    descripcion = st.text_area("Descripción:", perfil["descripcion"])
-    servicios = st.text_area("Servicios ofrecidos (separar por coma):", ", ".join(perfil["servicios"]))
-    if st.button("Guardar cambios"):
-        st.session_state.perfil_propio = {
-            "nombre": nombre,
-            "edad": edad,
-            "descripcion": descripcion,
-            "servicios": [s.strip() for s in servicios.split(",") if s.strip()],
-            "valoracion": perfil["valoracion"],
-        }
-        st.success("Perfil actualizado ✅")
-        set_page("perfil_usuario")
     render_footer()
