@@ -1,85 +1,98 @@
 import streamlit as st
 
-# --- CONFIGURACIÓN ---
+# --- CONFIG ---
 st.set_page_config(page_title="Conecta", page_icon="🤝", layout="wide")
 
-# --- ESTILO CSS PARA BOTONES UNIFORMES ---
-st.markdown("""
-<style>
-/* Botones grandes uniformes */
-div.stButton > button {
-    height: 80px;
-    width: 200px;
-    background-color: #4CAF50;
-    color: white;
-    border-radius: 12px;
-    font-size: 18px;
-    margin: 5px 10px;
-}
-div.stButton > button:hover {
-    background-color: #45a049;
-}
+# Si en la URL hay ?pagina=..., respetarla y guardarla en session_state
+query_params = st.experimental_get_query_params()
+if "pagina" in query_params:
+    # toma el primer valor (query params vienen como listas)
+    st.session_state.pagina = query_params["pagina"][0]
 
-/* Footer fijo */
-.footer {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 70px;
-    background-color: #f1f1f1;
-    display: flex;
-    justify-content: space-around;
-    align-items: center;
-    border-top: 1px solid #ccc;
-    z-index: 100;
-}
-.footer button {
-    font-size: 28px;
-    background: none;
-    border: none;
-    cursor: pointer;
-}
-body {
-    margin-bottom: 90px; /* espacio para que el contenido no quede debajo del footer */
-}
-</style>
-""", unsafe_allow_html=True)
-
-# --- ESTADO DE NAVEGACIÓN ---
+# --- ESTADO POR DEFECTO ---
 if "pagina" not in st.session_state:
     st.session_state.pagina = "inicio"
 if "categoria" not in st.session_state:
     st.session_state.categoria = None
 
-# --- FUNCIONES AUXILIARES ---
+# --- CSS (botones uniformes + footer fijo) ---
+st.markdown(
+    """
+    <style>
+    /* Botones grandes uniformes */
+    div.stButton > button {
+        height: 80px;
+        width: 200px;
+        background-color: #4CAF50;
+        color: white;
+        border-radius: 12px;
+        font-size: 18px;
+        margin: 5px 10px;
+    }
+    div.stButton > button:hover {
+        background-color: #45a049;
+    }
+
+    /* Footer fijo */
+    .footer {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 70px;
+        background-color: #ffffff;
+        display: flex;
+        justify-content: space-around;
+        align-items: center;
+        border-top: 1px solid rgba(0,0,0,0.08);
+        z-index: 1000;
+        box-shadow: 0 -2px 6px rgba(0,0,0,0.06);
+    }
+    .footer a {
+        font-size: 28px;
+        text-decoration: none;
+        color: #333333;
+        padding: 8px 18px;
+        border-radius: 10px;
+    }
+    .footer a:hover {
+        background-color: rgba(0,0,0,0.03);
+    }
+
+    /* deja espacio inferior para que el contenido no quede tapado por el footer */
+    .streamlit-expanderHeader, body {
+        margin-bottom: 90px;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+# --- Helpers ---
 def volver(pagina):
+    """Botón volver estándar (usa st.button)"""
     if st.button("⬅️ Volver"):
         st.session_state.pagina = pagina
+        # limpiamos query params para mantener coherencia URL <-> estado
+        st.experimental_set_query_params()
         st.rerun()
 
-# --- FUNCION PARA FOOTER FIJO ---
-def footer_fijo():
-    st.markdown("""
+def render_footer():
+    """
+    Renderiza el footer fijo como HTML con enlaces que usan query params.
+    No usamos st.button aquí para evitar duplicados visuales.
+    """
+    footer_html = f"""
     <div class="footer">
-        <form method="post">
-            <button name="chats">💬</button>
-            <button name="notificaciones">🔔</button>
-            <button name="perfil">👤</button>
-        </form>
+        <a href="?pagina=chats" title="Chats">💬</a>
+        <a href="?pagina=notificaciones" title="Notificaciones">🔔</a>
+        <a href="?pagina=perfil_usuario" title="Mi perfil">👤</a>
     </div>
-    """, unsafe_allow_html=True)
+    """
+    st.markdown(footer_html, unsafe_allow_html=True)
 
-    # Captura clicks con session_state
-    if st.experimental_get_query_params().get("chats") or st.button("💬", key="chats"):
-        st.session_state.pagina = "chats"
-        st.rerun()
-    if st.experimental_get_query_params().get("notificaciones") or st.button("🔔", key="notificaciones"):
-        st.session_state.pagina = "notificaciones"
-        st.rerun()
-    if st.experimental_get_query_params().get("perfil") or st.button("👤", key="perfil"):
-        st.session_state.pagina = "perfil_usuario"
-        st.rerun()
+# --- Navegación principal ---
+# Nota: Al inicio leemos query params más arriba; aquí manejamos páginas por session_state.
 
 # --- PANTALLA INICIO ---
 if st.session_state.pagina == "inicio":
@@ -88,6 +101,8 @@ if st.session_state.pagina == "inicio":
 
     if st.button("Acerca de"):
         st.session_state.pagina = "acerca"
+        st.experimental_set_query_params()  # limpiar params
+        st.rerun()
 
     st.subheader("Selecciona una categoría:")
     col1, col2 = st.columns(2)
@@ -96,33 +111,43 @@ if st.session_state.pagina == "inicio":
         if st.button("Cuidado de mascotas"):
             st.session_state.categoria = "Mascotas"
             st.session_state.pagina = "subcategoria"
+            st.experimental_set_query_params()
+            st.rerun()
         if st.button("Limpieza y hogar"):
             st.session_state.categoria = "Hogar"
             st.session_state.pagina = "subcategoria"
+            st.experimental_set_query_params()
+            st.rerun()
 
     with col2:
         if st.button("Clases particulares"):
             st.session_state.categoria = "Clases"
             st.session_state.pagina = "subcategoria"
+            st.experimental_set_query_params()
+            st.rerun()
         if st.button("Cuidado de niños"):
             st.session_state.categoria = "Niños"
             st.session_state.pagina = "subcategoria"
+            st.experimental_set_query_params()
+            st.rerun()
 
-    footer_fijo()
+    render_footer()
 
-# --- PANTALLA ACERCA DE ---
+# --- ACERCA ---
 elif st.session_state.pagina == "acerca":
     st.title("Acerca de Conecta")
-    st.write("""
-    **Conecta** es una aplicación pensada para unir a personas que buscan
-    servicios con quienes los ofrecen.  
-    Puedes crear tu perfil, mostrar tus trabajos y contactar directamente
-    con otros usuarios de tu zona.
-    """)
+    st.write(
+        """
+        **Conecta** es una aplicación pensada para unir a personas que buscan
+        servicios con quienes los ofrecen.  
+        Puedes crear tu perfil, mostrar tus trabajos y contactar directamente
+        con otros usuarios de tu zona.
+        """
+    )
     volver("inicio")
-    footer_fijo()
+    render_footer()
 
-# --- PANTALLA SUBCATEGORÍAS SOLO LISTA DESPLEGABLE ---
+# --- SUBCATEGORIAS (selectbox simple) ---
 elif st.session_state.pagina == "subcategoria":
     st.title(f"Categoría: {st.session_state.categoria}")
     volver("inicio")
@@ -139,11 +164,12 @@ elif st.session_state.pagina == "subcategoria":
     if seleccion != "-- Elige una opción --":
         st.session_state.servicio = seleccion
         st.session_state.pagina = "ubicacion"
+        st.experimental_set_query_params()
         st.rerun()
 
-    footer_fijo()
+    render_footer()
 
-# --- PANTALLA UBICACIÓN (CIUDAD Y COMUNA) ---
+# --- UBICACIÓN (ciudad + comuna) ---
 elif st.session_state.pagina == "ubicacion":
     st.title("📍 Selecciona tu ubicación")
     volver("subcategoria")
@@ -166,31 +192,37 @@ elif st.session_state.pagina == "ubicacion":
         else:
             st.session_state.ubicacion = f"{comuna}, {ciudad}"
             st.session_state.pagina = "resultados"
+            st.experimental_set_query_params()
             st.rerun()
 
-    footer_fijo()
+    render_footer()
 
-# --- PANTALLA RESULTADOS ---
+# --- RESULTADOS ---
 elif st.session_state.pagina == "resultados":
     st.title(f"Resultados para '{st.session_state.servicio}' en {st.session_state.ubicacion}")
     volver("ubicacion")
 
     resultados = [
-        {"nombre": "Juan Pérez", "servicio": st.session_state.servicio, "valoracion": "★★★★☆", "edad": 28},
-        {"nombre": "María Gómez", "servicio": st.session_state.servicio, "valoracion": "★★★★★", "edad": 32},
-        {"nombre": "Pedro Ramírez", "servicio": st.session_state.servicio, "valoracion": "★★★☆☆", "edad": 24},
+        {"nombre": "Juan Pérez", "servicio": st.session_state.servicio, "valoracion": "★★★★☆", "edad": 28, "comunas": ["Providencia","Ñuñoa"]},
+        {"nombre": "María Gómez", "servicio": st.session_state.servicio, "valoracion": "★★★★★", "edad": 32, "comunas": ["Las Condes","Providencia"]},
+        {"nombre": "Pedro Ramírez", "servicio": st.session_state.servicio, "valoracion": "★★★☆☆", "edad": 24, "comunas": ["Maipú","Santiago"]},
     ]
 
-    for r in resultados:
+    # Filtrado básico por comuna (ejemplo)
+    comuna_actual = st.session_state.get("ubicacion", "").split(",")[0]
+    mostrados = [r for r in resultados if comuna_actual in r.get("comunas", [])] or resultados
+
+    for r in mostrados:
         st.info(f"{r['nombre']} - {r['servicio']} - {r['valoracion']} - {r['edad']} años")
         if st.button(f"Ver perfil de {r['nombre']}"):
             st.session_state.perfil_usuario = r
             st.session_state.pagina = "perfil"
+            st.experimental_set_query_params()
             st.rerun()
 
-    footer_fijo()
+    render_footer()
 
-# --- PANTALLA PERFIL Y CHAT ---
+# --- PERFIL (terceros) ---
 elif st.session_state.pagina == "perfil":
     r = st.session_state.perfil_usuario
     st.title(f"👤 Perfil de {r['nombre']}")
@@ -209,25 +241,25 @@ elif st.session_state.pagina == "perfil":
         else:
             st.warning("No puedes enviar un mensaje vacío.")
 
-    footer_fijo()
+    render_footer()
 
-# --- PANTALLA CHATS ---
+# --- CHATS (desde footer) ---
 elif st.session_state.pagina == "chats":
     st.title("💬 Chats")
     volver("inicio")
-    st.write("Aquí estarán todos tus chats con usuarios.")
-    footer_fijo()
+    st.write("Aquí estarán todos tus chats con usuarios (simulación).")
+    render_footer()
 
-# --- PANTALLA NOTIFICACIONES ---
+# --- NOTIFICACIONES (desde footer) ---
 elif st.session_state.pagina == "notificaciones":
     st.title("🔔 Notificaciones")
     volver("inicio")
-    st.write("Aquí recibirás alertas cuando alguien vea tu perfil o deje una reseña.")
-    footer_fijo()
+    st.write("Aquí recibirás alertas cuando alguien vea tu perfil o deje una reseña (simulación).")
+    render_footer()
 
-# --- PANTALLA PERFIL PROPIO ---
+# --- PERFIL PROPIO (desde footer) ---
 elif st.session_state.pagina == "perfil_usuario":
     st.title("👤 Mi Perfil")
     volver("inicio")
-    st.write("Aquí puedes editar tu perfil, ver tus valoraciones y trabajos realizados.")
-    footer_fijo()
+    st.write("Aquí puedes editar tu perfil, ver tus valoraciones y trabajos realizados (simulación).")
+    render_footer()
