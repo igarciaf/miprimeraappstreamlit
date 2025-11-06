@@ -6,7 +6,7 @@ import streamlit as st
 st.set_page_config(page_title="Conecta", page_icon="🤝", layout="wide")
 
 # -------------------------
-# Si la URL trae ?pagina=... la respetamos (permite que el logo vuelva al inicio)
+# Si la URL trae ?pagina=... la respetamos
 # -------------------------
 query_params = st.experimental_get_query_params()
 if "pagina" in query_params:
@@ -26,7 +26,9 @@ if "ubicacion" not in st.session_state:
 if "perfil_usuario" not in st.session_state:
     st.session_state.perfil_usuario = None
 if "mensajes_chat" not in st.session_state:
-    st.session_state.mensajes_chat = []  # mensajes del chat
+    st.session_state.mensajes_chat = []
+if "msg_input" not in st.session_state:
+    st.session_state.msg_input = ""
 
 # -------------------------
 # CSS
@@ -177,15 +179,13 @@ if st.session_state.pagina == "inicio":
     st.write("Consejo: usa la barra inferior para acceder rápidamente a Chats, Notificaciones o a tu Perfil.")
     render_footer()
 
-
-# ---------- CHATS (mejorado) ----------
+# ---------- CHATS ----------
 elif st.session_state.pagina == "chats":
     st.markdown('<h1 class="conecta-title">💬 Chat</h1>', unsafe_allow_html=True)
     volver("inicio")
 
     st.markdown("---")
 
-    # Mostrar mensajes previos
     if st.session_state.mensajes_chat:
         for msg in st.session_state.mensajes_chat:
             align = "right" if msg["autor"] == "Tú" else "left"
@@ -200,15 +200,13 @@ elif st.session_state.pagina == "chats":
     else:
         st.info("No hay mensajes todavía. Escribe algo para comenzar la conversación 👇")
 
-    # Entrada de texto y envío
     mensaje = st.text_input("Escribe un mensaje y presiona Enter para enviar:", key="msg_input")
-    if mensaje:
+    if mensaje.strip() != "":
         st.session_state.mensajes_chat.append({"autor": "Tú", "texto": mensaje})
-        st.session_state.msg_input = ""
+        st.session_state.msg_input = ""  # limpiamos de forma segura
         st.rerun()
 
     render_footer()
-
 
 # ---------- NOTIFICACIONES ----------
 elif st.session_state.pagina == "notificaciones":
