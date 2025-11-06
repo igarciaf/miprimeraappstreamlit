@@ -6,14 +6,15 @@ import streamlit as st
 st.set_page_config(page_title="Conecta", page_icon="🤝", layout="wide")
 
 # -------------------------
-# Si la URL trae ?pagina=... la respetamos
+# Si la URL trae ?pagina=... la respetamos (permite que el logo vuelva al inicio)
 # -------------------------
 query_params = st.experimental_get_query_params()
 if "pagina" in query_params:
+    # sólo setear si viene en query params para mantener compatibilidad con los enlaces del footer
     st.session_state.pagina = query_params["pagina"][0]
 
 # -------------------------
-# ESTADOS POR DEFECTO
+# ESTADOS POR DEFECTO (seguros)
 # -------------------------
 if "pagina" not in st.session_state:
     st.session_state.pagina = "inicio"
@@ -25,8 +26,12 @@ if "ubicacion" not in st.session_state:
     st.session_state.ubicacion = None
 if "perfil_usuario" not in st.session_state:
     st.session_state.perfil_usuario = None
+
+# historial de mensajes (lista de dicts: {"autor": "...", "texto": "...", "hora": "HH:MM"})
 if "mensajes_chat" not in st.session_state:
     st.session_state.mensajes_chat = []
+
+# campo controlado para el input del chat
 if "msg_input" not in st.session_state:
     st.session_state.msg_input = ""
 
@@ -104,6 +109,19 @@ st.markdown(
         text-align: center;
         margin-bottom: 8px;
     }
+
+    /* chat bubbles minimal */
+    .chat-bubble {
+        padding: 10px 12px;
+        border-radius: 12px;
+        margin: 6px 0;
+        display: inline-block;
+        max-width: 70%;
+        word-wrap: break-word;
+    }
+    .chat-right { background: #DCF8C6; text-align: right; float: right; clear: both; }
+    .chat-left { background: #F1F0F0; text-align: left; float: left; clear: both; }
+    .chat-time { font-size: 10px; color: #666; margin-top: 4px; display:block; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -114,6 +132,7 @@ st.markdown(
 # -------------------------
 def set_page(pagina_name):
     st.session_state.pagina = pagina_name
+    # actualizar query params para que los enlaces funcionen y para navegacion coherente
     st.experimental_set_query_params(pagina=pagina_name)
     st.rerun()
 
@@ -138,6 +157,29 @@ def render_footer():
     </div>
     """
     st.markdown(footer_html, unsafe_allow_html=True)
+
+# -------------------------
+# FUNCION PARA ENVIAR MENSAJE (callback para text_input)
+# -------------------------
+from datetime import datetime
+
+def send_chat_message():
+    """
+    callback seguro: se ejecuta fuera del render principal por Streamlit cuando
+    el usuario presiona Enter (o el input cambia y pierde foco).
+    """
+    texto = st.session_state.get("msg_input", "").strip()
+    if texto:
+        hora = datetime.now().strftime("%H:%M")
+        # append de forma segura al estado
+        st.session_state.mensajes_chat.append({"autor": "Tú", "texto": texto, "hora": hora})
+        # (opcional) simulamos una respuesta inmediata del otro usuario para pruebas
+        # comentar o eliminar la siguiente 3 líneas si no quieres respuesta automática
+        respuesta = "Gracias, te responderé pronto 👍"
+        hora2 = datetime.now().strftime("%H:%M")
+        st.session_state.mensajes_chat.append({"autor": "Otro", "texto": respuesta, "hora": hora2})
+    # limpiar el campo de input de forma segura dentro del callback
+    st.session_state.msg_input = ""
 
 # -------------------------
 # TOPBAR
@@ -179,38 +221,33 @@ if st.session_state.pagina == "inicio":
     st.write("Consejo: usa la barra inferior para acceder rápidamente a Chats, Notificaciones o a tu Perfil.")
     render_footer()
 
-# ---------- CHATS (corregido y funcional) ----------
+# ---------- CHATS (corregido y profesional) ----------
 elif st.session_state.pagina == "chats":
-    st.markdown('<h1 class="conecta-title">💬 Chat</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="conecta-title">💬 Chats</h1>', unsafe_allow_html=True)
     volver("inicio")
+
     st.markdown("---")
 
-    # Mostrar mensajes anteriores
+    # Mostrar mensajes previos (si existen)
     if st.session_state.mensajes_chat:
+        # iterar y mostrar con burbujas y hora
         for msg in st.session_state.mensajes_chat:
-            align = "right" if msg["autor"] == "Tú" else "left"
-            color = "#DCF8C6" if msg["autor"] == "Tú" else "#F1F0F0"
+            clase = "chat-right" if msg.get("autor") == "Tú" else "chat-left"
+            texto = msg.get("texto", "")
+            hora = msg.get("hora", "")
             st.markdown(
-                f"<div style='text-align:{align}; background-color:{color}; "
-                f"padding:10px; border-radius:12px; margin:6px; "
-                f"display:inline-block; max-width:70%;'>"
-                f"<b>{msg['autor']}:</b> {msg['texto']}</div>",
-                unsafe_allow_html=True
+                f'<div class="chat-bubble {clase}">{texto}<span class="chat-time">{hora}</span></div>',
+                unsafe_allow_html=True,
             )
     else:
         st.info("No hay mensajes todavía. Escribe algo para comenzar la conversación 👇")
 
-    # Campo de entrada
-    mensaje = st.text_input("Escribe un mensaje y presiona Enter para enviar:", key="msg_input")
-
-    # Procesamiento del mensaje
-    if st.session_state.msg_input and mensaje == st.session_state.msg_input:
-        texto = st.session_state.msg_input.strip()
-        if texto:
-            st.session_state.mensajes_chat.append({"autor": "Tú", "texto": texto})
-            # Limpieza segura (no directa)
-            st.session_state.update({"msg_input": ""})
-            st.rerun()
+    # Campo de entrada controlado: al presionar Enter se ejecuta send_chat_message (callback)
+    st.text_input(
+        "Escribe un mensaje y presiona Enter para enviar:",
+        key="msg_input",
+        on_change=send_chat_message
+    )
 
     render_footer()
 
@@ -218,6 +255,7 @@ elif st.session_state.pagina == "chats":
 elif st.session_state.pagina == "notificaciones":
     st.markdown('<h1 class="conecta-title">🔔 Notificaciones</h1>', unsafe_allow_html=True)
     volver("inicio")
+    # por ahora mostramos estático (puedes enlazar con st.session_state.notificaciones en el futuro)
     st.write("✅ Tu perfil fue visitado por @usuario123")
     st.write("💬 Tienes una nueva reseña en tu último trabajo")
     st.write("⭐ Recibiste una valoración de 5 estrellas")
