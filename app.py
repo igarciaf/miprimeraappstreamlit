@@ -1,4 +1,5 @@
 import streamlit as st
+from datetime import datetime
 
 # -------------------------
 # CONFIGURACIÓN DE PÁGINA
@@ -6,31 +7,42 @@ import streamlit as st
 st.set_page_config(page_title="Conecta", page_icon="🤝", layout="wide")
 
 # -------------------------
-# CONTROL DE ESTADO Y NAVEGACIÓN
+# Si la URL trae ?pagina=... la respetamos (permite que el logo vuelva al inicio)
+# -------------------------
+query_params = st.experimental_get_query_params()
+if "pagina" in query_params:
+    # si viene en query params lo guardamos (esto permite que los enlaces href="?pagina=..." funcionen)
+    st.session_state.pagina = query_params["pagina"][0]
+
+# -------------------------
+# ESTADOS POR DEFECTO (seguros)
 # -------------------------
 if "pagina" not in st.session_state:
     st.session_state.pagina = "inicio"
 if "categoria" not in st.session_state:
     st.session_state.categoria = None
+if "servicio" not in st.session_state:
+    st.session_state.servicio = None
+if "ubicacion" not in st.session_state:
+    st.session_state.ubicacion = None
+if "perfil_usuario" not in st.session_state:
+    st.session_state.perfil_usuario = None
+
+# historial de mensajes (lista de dicts: {"autor": "...", "texto": "...", "hora": "HH:MM"})
 if "mensajes_chat" not in st.session_state:
     st.session_state.mensajes_chat = []
+
+# campo controlado para el input del chat
 if "msg_input" not in st.session_state:
     st.session_state.msg_input = ""
 
-def set_page(pagina_name):
-    st.session_state.pagina = pagina_name
-    st.experimental_rerun()
-
-def volver(pagina_destino="inicio"):
-    if st.button("⬅️ Volver"):
-        set_page(pagina_destino)
-
 # -------------------------
-# CSS MEJORADO
+# CSS (hover más oscuro, footer fijo por HTML, estilos chat)
 # -------------------------
 st.markdown(
     """
     <style>
+    /* botones uniformes */
     div.stButton > button {
         height: 76px;
         width: 200px;
@@ -40,16 +52,19 @@ st.markdown(
         font-size: 17px;
         margin: 6px 8px;
         border: none;
-        transition: background-color 0.2s ease;
+        transition: background-color 0.15s ease, transform 0.12s ease;
     }
     div.stButton > button:hover {
-        background-color: #276e47;
+        background-color: #276e47; /* un verde más oscuro para mejor contraste */
         transform: translateY(-1px);
     }
 
+    /* top bar fija */
     .top-bar {
         position: fixed;
-        top: 0; left: 0; right: 0;
+        top: 0;
+        left: 0;
+        right: 0;
         height: 64px;
         background-color: #2E8B57;
         color: white;
@@ -61,10 +76,15 @@ st.markdown(
         z-index: 9999;
         box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     }
+    .top-bar a { color: white; text-decoration: none; padding: 8px 16px; }
+    .top-bar a:hover { opacity: 0.95; cursor: pointer; }
 
+    /* footer fijo (HTML) */
     .conecta-footer {
         position: fixed;
-        bottom: 0; left: 0; right: 0;
+        bottom: 0;
+        left: 0;
+        right: 0;
         height: 72px;
         background-color: #ffffff;
         display: flex;
@@ -74,8 +94,7 @@ st.markdown(
         z-index: 9999;
         box-shadow: 0 -4px 12px rgba(0,0,0,0.06);
     }
-
-    .footer-btn {
+    .conecta-footer a {
         font-size: 26px;
         text-decoration: none;
         color: #333333;
@@ -84,43 +103,84 @@ st.markdown(
         display: flex;
         flex-direction: column;
         align-items: center;
-        cursor: pointer;
-        transition: background-color 0.2s ease;
     }
-    .footer-btn:hover {
-        background-color: rgba(0,0,0,0.05);
-    }
-    .footer-text { font-size: 11px; margin-top: 4px; }
+    .conecta-footer a div { font-size:11px; margin-top:4px; }
+    .conecta-footer a:hover { background-color: rgba(0,0,0,0.03); cursor: pointer; }
 
-    .main > div { margin-top: 90px; margin-bottom: 100px; }
+    /* espacio para que el contenido no quede oculto */
+    .main > div {
+        margin-top: 90px;
+        margin-bottom: 100px;
+    }
     .conecta-title { text-align: center; margin-bottom: 8px; }
+
+    /* chat bubbles */
+    .chat-bubble { padding: 10px 12px; border-radius: 12px; margin: 6px 0; display: inline-block; max-width: 70%; word-wrap: break-word; }
+    .chat-right { background: #DCF8C6; text-align: right; float: right; clear: both; }
+    .chat-left { background: #F1F0F0; text-align: left; float: left; clear: both; }
+    .chat-time { font-size: 10px; color: #666; margin-top: 4px; display:block; }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
 # -------------------------
-# TOP BAR
+# FUNCIONES DE NAVEGACIÓN (seguras)
 # -------------------------
-st.markdown('<div class="top-bar">ConectaServicios</div>', unsafe_allow_html=True)
+def set_page(pagina_name):
+    """
+    Actualiza el estado y la URL (query param).
+    No usamos experimental_rerun para evitar errores en entornos donde no esté disponible.
+    El comportamiento de navegación funciona porque al inicio leemos query_params.
+    """
+    st.session_state.pagina = pagina_name
+    st.experimental_set_query_params(pagina=pagina_name)
+    # No forzamos rerun; la app seguirá en este ciclo y renderizará según el nuevo estado.
+
+def volver(pagina_destino="inicio"):
+    if st.button("⬅️ Volver"):
+        set_page(pagina_destino)
+
+def render_topbar():
+    top_html = """
+    <div class="top-bar">
+        <a href="?pagina=inicio">ConectaServicios</a>
+    </div>
+    """
+    st.markdown(top_html, unsafe_allow_html=True)
+
+def render_footer_html():
+    # Footer como HTML con enlaces que cambian ?pagina=... en la misma ventana (no abre pestañas)
+    footer_html = """
+    <div class="conecta-footer">
+        <a href="?pagina=chats" title="Chats">💬<div>Chats</div></a>
+        <a href="?pagina=notificaciones" title="Notificaciones">🔔<div>Notifs</div></a>
+        <a href="?pagina=perfil_usuario" title="Mi perfil">👤<div>Perfil</div></a>
+    </div>
+    """
+    st.markdown(footer_html, unsafe_allow_html=True)
 
 # -------------------------
-# FOOTER (ahora funcional dentro de Streamlit)
+# FUNCION PARA ENVIAR MENSAJE (callback para text_input)
 # -------------------------
-def render_footer():
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        if st.button("💬 Chats"):
-            set_page("chats")
-    with col2:
-        if st.button("🔔 Notifs"):
-            set_page("notificaciones")
-    with col3:
-        if st.button("👤 Perfil"):
-            set_page("perfil_usuario")
+def send_chat_message():
+    texto = st.session_state.get("msg_input", "").strip()
+    if texto:
+        hora = datetime.now().strftime("%H:%M")
+        st.session_state.mensajes_chat.append({"autor": "Tú", "texto": texto, "hora": hora})
+        # respuesta automática de prueba (opcional)
+        hora2 = datetime.now().strftime("%H:%M")
+        st.session_state.mensajes_chat.append({"autor": "Otro", "texto": "Gracias, te respondo pronto 👍", "hora": hora2})
+    # limpiar el campo desde el callback (seguro)
+    st.session_state.msg_input = ""
 
 # -------------------------
-# PANTALLAS
+# RENDER TOPBAR
+# -------------------------
+render_topbar()
+
+# -------------------------
+# PANTALLAS (igual que tu estructura original)
 # -------------------------
 
 # ---------- INICIO ----------
@@ -133,6 +193,7 @@ if st.session_state.pagina == "inicio":
 
     st.subheader("Selecciona una categoría:")
     c1, c2 = st.columns(2)
+
     with c1:
         if st.button("Cuidado de mascotas"):
             st.session_state.categoria = "Mascotas"
@@ -140,6 +201,7 @@ if st.session_state.pagina == "inicio":
         if st.button("Limpieza y hogar"):
             st.session_state.categoria = "Hogar"
             set_page("subcategoria")
+
     with c2:
         if st.button("Clases particulares"):
             st.session_state.categoria = "Clases"
@@ -150,49 +212,51 @@ if st.session_state.pagina == "inicio":
 
     st.markdown("---")
     st.write("Consejo: usa la barra inferior para acceder rápidamente a Chats, Notificaciones o a tu Perfil.")
-    render_footer()
+    render_footer_html()
 
 # ---------- CHATS ----------
 elif st.session_state.pagina == "chats":
-    st.markdown('<h1 class="conecta-title">💬 Chat</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="conecta-title">💬 Chats</h1>', unsafe_allow_html=True)
     volver("inicio")
     st.markdown("---")
 
-    # Mostrar mensajes previos
+    # Mostrar mensajes previos (si existen)
     if st.session_state.mensajes_chat:
         for msg in st.session_state.mensajes_chat:
-            align = "right" if msg["autor"] == "Tú" else "left"
-            color = "#DCF8C6" if msg["autor"] == "Tú" else "#F1F0F0"
+            clase = "chat-right" if msg.get("autor") == "Tú" else "chat-left"
+            texto = msg.get("texto", "")
+            hora = msg.get("hora", "")
             st.markdown(
-                f"<div style='text-align:{align}; background-color:{color}; padding:10px; border-radius:12px; "
-                f"margin:6px; display:inline-block; max-width:70%;'><b>{msg['autor']}:</b> {msg['texto']}</div>",
-                unsafe_allow_html=True
+                f'<div class="chat-bubble {clase}">{texto}<span class="chat-time">{hora}</span></div>',
+                unsafe_allow_html=True,
             )
     else:
         st.info("No hay mensajes todavía. Escribe algo para comenzar la conversación 👇")
 
-    mensaje = st.text_input("Escribe un mensaje y presiona Enter para enviar:", key="msg_input")
-    if mensaje.strip():
-        st.session_state.mensajes_chat.append({"autor": "Tú", "texto": mensaje})
-        st.session_state.msg_input = ""
-        st.experimental_rerun()
+    # Campo controlado: al presionar Enter se ejecuta send_chat_message
+    st.text_input(
+        "Escribe un mensaje y presiona Enter para enviar:",
+        key="msg_input",
+        on_change=send_chat_message
+    )
 
-    render_footer()
+    render_footer_html()
 
 # ---------- NOTIFICACIONES ----------
 elif st.session_state.pagina == "notificaciones":
     st.markdown('<h1 class="conecta-title">🔔 Notificaciones</h1>', unsafe_allow_html=True)
     volver("inicio")
+    # por ahora mostramos estático, luego podemos enlazar a st.session_state.notificaciones
     st.write("✅ Tu perfil fue visitado por @usuario123")
     st.write("💬 Tienes una nueva reseña en tu último trabajo")
     st.write("⭐ Recibiste una valoración de 5 estrellas")
-    render_footer()
+    render_footer_html()
 
 # ---------- PERFIL ----------
 elif st.session_state.pagina == "perfil_usuario":
     st.markdown('<h1 class="conecta-title">👤 Mi Perfil</h1>', unsafe_allow_html=True)
     volver("inicio")
     st.write("**Nombre:** Ignacio")
-    st.write("**Edad:** XX")
+    st.write("**Edad:**  XX")
     st.write("**Servicios ofrecidos:** Paseo de perros, Cuidado por horas (ejemplo)")
-    render_footer()
+    render_footer_html()
