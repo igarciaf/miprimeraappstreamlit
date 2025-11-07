@@ -79,6 +79,23 @@ st.markdown(
     .top-bar a { color: white; text-decoration: none; padding: 8px 16px; }
     .top-bar a:hover { opacity: 0.95; cursor: pointer; }
 
+    /* botón adicional en top-bar (derecha) */
+    .top-bar .top-btn {
+        position: absolute;
+        right: 16px;
+        top: 14px;
+        background: rgba(255,255,255,0.12);
+        color: white;
+        border: 1px solid rgba(255,255,255,0.18);
+        padding: 6px 12px;
+        border-radius: 8px;
+        font-size: 14px;
+        text-decoration: none;
+    }
+    .top-bar .top-btn:hover {
+        background: rgba(255,255,255,0.18);
+    }
+
     /* footer fijo (HTML) */
     .conecta-footer {
         position: fixed;
@@ -140,10 +157,14 @@ def volver(pagina_destino="inicio"):
     if st.button("⬅️ Volver"):
         set_page(pagina_destino)
 
+# -------------------------
+# RENDER TOPBAR (modificado para incluir botón "Inicio" en la parte superior derecha)
+# -------------------------
 def render_topbar():
     top_html = """
     <div class="top-bar">
         <a href="?pagina=inicio">ConectaServicios</a>
+        <a class="top-btn" href="?pagina=inicio">Inicio</a>
     </div>
     """
     st.markdown(top_html, unsafe_allow_html=True)
