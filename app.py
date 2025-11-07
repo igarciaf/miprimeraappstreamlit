@@ -8,7 +8,40 @@ from datetime import datetime
 st.set_page_config(page_title="Conecta", page_icon="🤝", layout="wide")
 
 # -------------------------
-# Si la URL trae ?pagina=... la respetamos
+# BOTÓN FIJO "INICIO" ARRIBA (no modifica la app, solo añade el botón)
+# -------------------------
+# Este bloque muestra un botón fijo arriba a la derecha que apunta a ?pagina=inicio
+st.markdown(
+    """
+    <style>
+    .inicio-btn {
+        position: fixed;
+        top: 12px;
+        right: 18px;
+        background-color: #2E8B57;
+        color: white;
+        padding: 8px 12px;
+        border-radius: 10px;
+        font-weight: 700;
+        border: none;
+        font-size: 14px;
+        cursor: pointer;
+        z-index: 99999;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.18);
+        transition: background-color 0.12s ease;
+        text-decoration: none;
+    }
+    .inicio-btn:hover { background-color: #276e47; }
+    </style>
+    <form action="?pagina=inicio">
+        <button class="inicio-btn" type="submit">🏠 Inicio</button>
+    </form>
+    """,
+    unsafe_allow_html=True,
+)
+
+# -------------------------
+# Si la URL trae ?pagina=... la respetamos (permite que el logo vuelva al inicio)
 # -------------------------
 query_params = st.experimental_get_query_params()
 if "pagina" in query_params:
@@ -37,12 +70,12 @@ if "msg_input" not in st.session_state:
     st.session_state.msg_input = ""
 
 # -------------------------
-# CSS (hover más oscuro, footer fijo por HTML, estilos chat)
+# CSS (hover más oscuro, footer fijo, estilos chat)
 # -------------------------
 st.markdown(
     """
     <style>
-    /* botones uniformes */
+    /* botones uniformes grandes (Streamlit buttons) */
     div.stButton > button {
         height: 76px;
         width: 200px;
@@ -55,11 +88,11 @@ st.markdown(
         transition: background-color 0.15s ease, transform 0.12s ease;
     }
     div.stButton > button:hover {
-        background-color: #276e47; /* un verde más oscuro para mejor contraste */
+        background-color: #276e47;
         transform: translateY(-1px);
     }
 
-    /* top bar fija */
+    /* top bar fija (nombre de la app en el centro) */
     .top-bar {
         position: fixed;
         top: 0;
@@ -107,11 +140,12 @@ st.markdown(
     .conecta-footer a div { font-size:11px; margin-top:4px; }
     .conecta-footer a:hover { background-color: rgba(0,0,0,0.03); cursor: pointer; }
 
-    /* espacio para que el contenido no quede oculto */
+    /* espacio para topbar y footer, para que el contenido no quede tapado */
     .main > div {
         margin-top: 90px;
         margin-bottom: 100px;
     }
+
     .conecta-title { text-align: center; margin-bottom: 8px; }
 
     /* chat bubbles */
@@ -130,8 +164,7 @@ st.markdown(
 def set_page(pagina_name):
     """
     Actualiza el estado y la URL (query param).
-    No usamos experimental_rerun para evitar errores en entornos donde no esté disponible.
-    El comportamiento de navegación funciona porque al inicio leemos query_params.
+    No forzamos rerun; la app volverá a ejecutarse en la siguiente interacción.
     """
     st.session_state.pagina = pagina_name
     st.experimental_set_query_params(pagina=pagina_name)
@@ -141,16 +174,15 @@ def volver(pagina_destino="inicio"):
         set_page(pagina_destino)
 
 def render_topbar():
+    # Topbar con el nombre que apunta a ?pagina=inicio (centrado)
     top_html = """
     <div class="top-bar">
         <a href="?pagina=inicio">ConectaServicios</a>
-        <a class="top-btn" style="position:absolute; right:16px; top:14px; background:rgba(255,255,255,0.12); color:white; border:1px solid rgba(255,255,255,0.18); padding:6px 12px; border-radius:8px; font-size:14px; text-decoration:none;" href="?pagina=inicio">Inicio</a>
     </div>
     """
     st.markdown(top_html, unsafe_allow_html=True)
 
 def render_footer_html():
-    # Footer como HTML con enlaces que cambian ?pagina=... en la misma ventana (no abre pestañas)
     footer_html = """
     <div class="conecta-footer">
         <a href="?pagina=chats" title="Chats">💬<div>Chats</div></a>
@@ -168,7 +200,7 @@ def send_chat_message():
     if texto:
         hora = datetime.now().strftime("%H:%M")
         st.session_state.mensajes_chat.append({"autor": "Tú", "texto": texto, "hora": hora})
-        # respuesta automática de prueba (opcional)
+        # respuesta automática de prueba (opcional), puedes quitar si no quieres
         hora2 = datetime.now().strftime("%H:%M")
         st.session_state.mensajes_chat.append({"autor": "Otro", "texto": "Gracias, te respondo pronto 👍", "hora": hora2})
     # limpiar el campo desde el callback (seguro)
@@ -180,7 +212,7 @@ def send_chat_message():
 render_topbar()
 
 # -------------------------
-# PANTALLAS (igual que tu estructura original)
+# PANTALLAS
 # -------------------------
 
 # ---------- INICIO ----------
@@ -246,17 +278,15 @@ elif st.session_state.pagina == "chats":
 elif st.session_state.pagina == "notificaciones":
     st.markdown('<h1 class="conecta-title">🔔 Notificaciones</h1>', unsafe_allow_html=True)
     volver("inicio")
-    # por ahora mostramos estático, luego podemos enlazar a st.session_state.notificaciones
     st.write("✅ Tu perfil fue visitado por @usuario123")
     st.write("💬 Tienes una nueva reseña en tu último trabajo")
-    # uso de entidades HTML para evitar caracteres especiales en el código fuente
+    # mostramos valoración usando entidades HTML para evitar errores en el intérprete
     st.markdown("⭐ Valoración promedio: &#9733;&#9733;&#9733;&#9733;&#9734; (4.0)", unsafe_allow_html=True)
     render_footer_html()
 
 # ---------- PERFIL (otros perfiles & propio) ----------
 elif st.session_state.pagina == "perfil":
     r = st.session_state.perfil_usuario or {"nombre": "Usuario"}
-    # aquí también uso entidades para mostrar estrellas sin insertar caracteres especiales fuera de strings
     st.markdown(f'<h1 class="conecta-title">👤 Perfil de {r["nombre"]}</h1>', unsafe_allow_html=True)
     volver("resultados")
     st.write("**Descripción:** Persona confiable (simulación).")
@@ -282,14 +312,14 @@ elif st.session_state.pagina == "subcategoria":
         set_page("ubicacion")
     render_footer_html()
 
-# ---------- UBICACIÓN (aquí agregué TODAS las comunas de Santiago) ----------
+# ---------- UBICACIÓN (lista completa de comunas de Santiago) ----------
 elif st.session_state.pagina == "ubicacion":
     st.markdown('<h1 class="conecta-title">📍 Selecciona tu ubicación</h1>', unsafe_allow_html=True)
     volver("subcategoria")
 
     ciudad = st.selectbox("Ciudad:", ["Santiago"])
 
-    # --- lista completa de comunas de la Región Metropolitana (Santiago) ---
+    # lista completa de comunas de la Región Metropolitana (Santiago)
     comunas_santiago = [
         "Cerrillos", "Cerro Navia", "Conchalí", "El Bosque", "Estación Central", "Huechuraba",
         "Independencia", "La Cisterna", "La Florida", "La Granja", "La Pintana", "La Reina",
@@ -317,7 +347,6 @@ elif st.session_state.pagina == "resultados":
         {"nombre": "María Gómez", "servicio": st.session_state.servicio, "valoracion": "&#9733;&#9733;&#9733;&#9733;&#9733;"}
     ]
     for r in resultados:
-        # mostramos valoración usando safe HTML
         st.markdown(f'{r["nombre"]} — {r["servicio"]} — <span>{r["valoracion"]}</span>', unsafe_allow_html=True)
         if st.button(f"Ver perfil de {r['nombre']}"):
             st.session_state.perfil_usuario = r
