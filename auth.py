@@ -30,4 +30,3 @@ def login_user(email: str, password: str) -> int:
     if verify_password(password, user["password_hash"]):
         return user["id"]
     return 0
-
