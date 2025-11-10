@@ -66,7 +66,7 @@ if "msg_input" not in st.session_state:
     st.session_state.msg_input = ""
 
 # -------------------------
-# CSS (hover más oscuro, footer fijo, estilos chat)
+# CSS (hover más oscuro, topbar, estilos chat)
 # -------------------------
 st.markdown(
     """
@@ -108,38 +108,10 @@ st.markdown(
     .top-bar a { color: white; text-decoration: none; padding: 8px 16px; }
     .top-bar a:hover { opacity: 0.95; cursor: pointer; }
 
-    /* footer fijo (HTML) */
-    .conecta-footer {
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        height: 72px;
-        background-color: #ffffff;
-        display: flex;
-        justify-content: space-around;
-        align-items: center;
-        border-top: 1px solid rgba(0,0,0,0.08);
-        z-index: 9999;
-        box-shadow: 0 -4px 12px rgba(0,0,0,0.06);
-    }
-    .conecta-footer a {
-        font-size: 26px;
-        text-decoration: none;
-        color: #333333;
-        padding: 8px 16px;
-        border-radius: 10px;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-    }
-    .conecta-footer a div { font-size:11px; margin-top:4px; }
-    .conecta-footer a:hover { background-color: rgba(0,0,0,0.03); cursor: pointer; }
-
-    /* espacio para topbar y footer, para que el contenido no quede tapado */
+    /* espacio inferior reservado (no visible footer ahora, se mantiene para que no tape contenido) */
     .main > div {
         margin-top: 90px;
-        margin-bottom: 100px;
+        margin-bottom: 40px;
     }
 
     .conecta-title { text-align: center; margin-bottom: 8px; }
@@ -178,15 +150,9 @@ def render_topbar():
     """
     st.markdown(top_html, unsafe_allow_html=True)
 
+# render_footer_html se vuelve no-op para eliminar la barra inferior sin tocar el resto del código
 def render_footer_html():
-    footer_html = """
-    <div class="conecta-footer">
-        <a href="?pagina=chats" title="Chats">💬<div>Chats</div></a>
-        <a href="?pagina=notificaciones" title="Notificaciones">🔔<div>Notifs</div></a>
-        <a href="?pagina=perfil_usuario" title="Mi perfil">👤<div>Perfil</div></a>
-    </div>
-    """
-    st.markdown(footer_html, unsafe_allow_html=True)
+    return None
 
 # -------------------------
 # FUNCION PARA ENVIAR MENSAJE (callback para text_input)
@@ -257,7 +223,8 @@ if st.session_state.pagina == "inicio":
             set_page("subcategoria")
 
     st.markdown("---")
-    st.write("Consejo: usa la barra inferior para acceder rápidamente a Chats, Notificaciones o a tu Perfil.")
+    st.write("Usa la barra lateral para navegar entre las secciones.")
+    # antes llamábamos a render_footer_html() aquí — ahora es no-op
     render_footer_html()
 
 # ---------- CHATS ----------
@@ -294,7 +261,6 @@ elif st.session_state.pagina == "notificaciones":
     volver("inicio")
     st.write("✅ Tu perfil fue visitado por @usuario123")
     st.write("💬 Tienes una nueva reseña en tu último trabajo")
-    # mostramos valoración usando entidades HTML para evitar errores en el intérprete
     st.markdown("⭐ Valoración promedio: &#9733;&#9733;&#9733;&#9733;&#9734; (4.0)", unsafe_allow_html=True)
     render_footer_html()
 
