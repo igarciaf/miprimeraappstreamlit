@@ -147,4 +147,3 @@ def mark_notification_read(notification_id: int):
     cur.execute("UPDATE notifications SET leido = 1 WHERE id = ?", (notification_id,))
     conn.commit()
     conn.close()
-
