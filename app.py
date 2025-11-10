@@ -4,14 +4,48 @@ from datetime import datetime
 import db
 import auth
 
-# ---- Inicialización DB / Auth ----
-# auth.init() llama a db.init_db() según tu auth.py
+# -------------------------
+# Inicializar DB (auth.init llama a db.init_db)
+# -------------------------
 auth.init()
 
-# ---- Configuración de página ----
+# -------------------------
+# Configuración página
+# -------------------------
 st.set_page_config(page_title="Conecta", page_icon="🤝", layout="wide")
 
-# ---- Lista de comunas (completa - usada en registro/editar perfil) ----
+# -------------------------
+# Leer query params para soportar el botón superior que apunta a ?page=inicio
+# -------------------------
+qp = st.experimental_get_query_params()
+if "page" in qp:
+    st.session_state.page = qp["page"][0]
+
+# -------------------------
+# Estados por defecto
+# -------------------------
+if "page" not in st.session_state:
+    st.session_state.page = "inicio"
+if "user_id" not in st.session_state:
+    st.session_state.user_id = 0
+if "user_name" not in st.session_state:
+    st.session_state.user_name = ""
+if "categoria" not in st.session_state:
+    st.session_state.categoria = None
+if "servicio" not in st.session_state:
+    st.session_state.servicio = None
+if "ubicacion" not in st.session_state:
+    st.session_state.ubicacion = None
+if "perfil_usuario" not in st.session_state:
+    st.session_state.perfil_usuario = None
+
+# chat temp state (keeps showing messages in UI; DB-backed chat implemented later)
+if "mensajes_chat" not in st.session_state:
+    st.session_state.mensajes_chat = []
+
+# -------------------------
+# Lista comunas (completa)
+# -------------------------
 comunas_santiago = [
     "Cerrillos", "Cerro Navia", "Conchalí", "El Bosque", "Estación Central", "Huechuraba",
     "Independencia", "La Cisterna", "La Florida", "La Granja", "La Pintana", "La Reina",
@@ -23,28 +57,23 @@ comunas_santiago = [
     "Melipilla", "María Pinto", "Curacaví", "Talagante", "El Monte", "Padre Hurtado", "Peñaflor"
 ]
 
-# ---- Session state defaults ----
-if "page" not in st.session_state:
-    st.session_state.page = "inicio"
-if "user_id" not in st.session_state:
-    st.session_state.user_id = 0   # 0 significa no autenticado
-if "user_name" not in st.session_state:
-    st.session_state.user_name = ""
-if "mensajes_chat" not in st.session_state:
-    st.session_state.mensajes_chat = []
-if "msg_input" not in st.session_state:
-    st.session_state.msg_input = ""
-
-# ---- Helpers de navegación ----
+# -------------------------
+# Helpers de navegación
+# -------------------------
 def set_page(page_name: str):
     st.session_state.page = page_name
+    # sincronizamos query param para que top button funcione coherente
+    st.experimental_set_query_params(page=page_name)
+    st.experimental_rerun()
 
-def require_login():
+def require_login(shortcut_to="login"):
     st.warning("Debes iniciar sesión para ver esta sección.")
     if st.button("Ir a Iniciar sesión"):
-        set_page("login")
+        set_page(shortcut_to)
 
-# ---- Topbar y botón inicio (fijo) ----
+# -------------------------
+# Topbar + botón Inicio fijo arriba (usa query param ?page=inicio)
+# -------------------------
 st.markdown(
     """
     <style>
@@ -64,6 +93,7 @@ st.markdown(
         z-index: 9999;
         box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     }
+    .top-bar a { color: white; text-decoration: none; padding: 8px 16px; }
     .inicio-btn {
         position: fixed;
         top: 12px;
@@ -78,21 +108,20 @@ st.markdown(
         cursor: pointer;
         z-index: 99999;
         box-shadow: 0 2px 6px rgba(0,0,0,0.18);
-        transition: background-color 0.12s ease;
         text-decoration: none;
     }
-    .inicio-btn:hover { background-color: #276e47; }
     .main > div { margin-top: 90px; margin-bottom: 40px; }
     </style>
-    <div class="top-bar">ConectaServicios</div>
+    <div class="top-bar"><a href="?page=inicio">ConectaServicios</a></div>
     <form action="?page=inicio"><button class="inicio-btn" type="submit">🏠 Inicio</button></form>
     """,
     unsafe_allow_html=True,
 )
 
-# ---- Barra lateral de navegación (segura) ----
+# -------------------------
+# Sidebar (navegación)
+# -------------------------
 pages_display = ["Inicio", "Iniciar sesión", "Registrarse", "Perfil", "Chats", "Notificaciones"]
-# map display name to internal page keys
 pages_map = {
     "Inicio": "inicio",
     "Iniciar sesión": "login",
@@ -102,42 +131,37 @@ pages_map = {
     "Notificaciones": "notificaciones"
 }
 
-# compute the current display name safely
+# determinar display actual de forma segura
 current_display = "Inicio"
 for k, v in pages_map.items():
     if v == st.session_state.page:
         current_display = k
         break
 
-# render radio with safe index
 with st.sidebar:
     st.markdown("### 🌐 Navegación")
     if st.session_state.user_id:
-        user = db.get_user_by_id(st.session_state.user_id)
-        name_display = user.get("nombre", "") if user else st.session_state.user_name
-        st.markdown(f"**{name_display}**")
+        u = db.get_user_by_id(st.session_state.user_id)
+        st.markdown(f"**{u.get('nombre','Usuario')}**")
     else:
         st.markdown("**Invitado**")
 
-    # Ensure the current_display is in pages_display (it always will be)
-    if current_display not in pages_display:
-        current_display = "Inicio"
-
-    sel = st.radio("Ir a:", pages_display, index=pages_display.index(current_display))
-    # update page according to selection
-    selected_page = pages_map.get(sel, "inicio")
+    selection = st.radio("Ir a:", pages_display, index=pages_display.index(current_display))
+    selected_page = pages_map.get(selection, "inicio")
     if selected_page != st.session_state.page:
         set_page(selected_page)
 
     st.markdown("---")
-    # If logged in show logout
-    if st.session_state.user_id and st.button("🚪 Cerrar sesión"):
-        st.session_state.user_id = 0
-        st.session_state.user_name = ""
-        st.success("Sesión cerrada.")
-        set_page("inicio")
+    if st.session_state.user_id:
+        if st.button("🚪 Cerrar sesión"):
+            st.session_state.user_id = 0
+            st.session_state.user_name = ""
+            st.success("Sesión cerrada")
+            set_page("inicio")
 
-# ---- Estilos pequeños (botones grandes igual que antes) ----
+# -------------------------
+# Styles (botones grandes como antes)
+# -------------------------
 st.markdown(
     """
     <style>
@@ -159,20 +183,21 @@ st.markdown(
     .chat-bubble { padding: 10px 12px; border-radius: 12px; margin: 6px 0; display: inline-block; max-width: 70%; word-wrap: break-word; }
     .chat-right { background: #DCF8C6; text-align: right; float: right; clear: both; }
     .chat-left { background: #F1F0F0; text-align: left; float: left; clear: both; }
-    .chat-time { font-size: 10px; color: #666; margin-top: 4px; display: block; }
+    .chat-time { font-size: 10px; color: #666; margin-top: 4px; display:block; }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
-# ---- Páginas ----
+# -------------------------
+# PÁGINAS
+# -------------------------
 
-# ---------- INICIO ----------
+# ---------- INICIO (mantener exactamente los botones grandes) ----------
 if st.session_state.page == "inicio":
     st.markdown('<h1 class="conecta-title">🤝 Conecta</h1>', unsafe_allow_html=True)
     st.write("Encuentra personas que ofrecen los servicios que necesitas.")
 
-    # Mantengo las opciones de búsqueda visibles siempre (tal como pediste)
     st.subheader("Selecciona una categoría:")
     c1, c2 = st.columns(2)
 
@@ -183,7 +208,6 @@ if st.session_state.page == "inicio":
         if st.button("Limpieza y hogar"):
             st.session_state.categoria = "Hogar"
             set_page("subcategoria")
-
     with c2:
         if st.button("Clases particulares"):
             st.session_state.categoria = "Clases"
@@ -193,7 +217,7 @@ if st.session_state.page == "inicio":
             set_page("subcategoria")
 
     st.markdown("---")
-    st.info("Usa la barra lateral para navegar entre las secciones. Si deseas usar chats o ver tu perfil, inicia sesión desde 'Iniciar sesión'.")
+    st.info("Usa la barra lateral para navegar (Perfil, Chats, Notificaciones).")
 
 # ---------- LOGIN ----------
 elif st.session_state.page == "login":
@@ -228,12 +252,11 @@ elif st.session_state.page == "registro":
                 new_id = auth.register_user(nombre.strip(), email_r.strip(), password_r, bio_r, comuna_r)
                 if new_id:
                     st.success("Cuenta creada correctamente. Ahora puedes iniciar sesión.")
-                    # optional: auto-login? we keep it manual to be safe
                     set_page("login")
                 else:
                     st.error("Ya existe un usuario con ese correo.")
 
-# ---------- SUBCATEGORIA (cuando eliges categoría) ----------
+# ---------- SUBCATEGORIA ----------
 elif st.session_state.page == "subcategoria":
     st.markdown(f'<h1 class="conecta-title">Categoría: {st.session_state.categoria}</h1>', unsafe_allow_html=True)
     if st.button("⬅️ Volver"):
@@ -245,7 +268,6 @@ elif st.session_state.page == "subcategoria":
         "Niños": ["Cuidado por horas", "Apoyo escolar", "Actividades recreativas", "Acompañamiento", "Transporte escolar"]
     }
     lista = opciones.get(st.session_state.categoria, [])
-    # muestro la lista desplegable simple
     for item in lista:
         if st.button(item):
             st.session_state.servicio = item
@@ -269,14 +291,14 @@ elif st.session_state.page == "resultados":
     st.markdown(f'<h1 class="conecta-title">Resultados: {servicio} — {ubic}</h1>', unsafe_allow_html=True)
     if st.button("⬅️ Volver"):
         set_page("ubicacion")
-    # simulación de resultados (más tarde conectar a BD real de oferentes)
+    # resultados simulados
     resultados = [
-        {"nombre": "Juan Pérez", "servicio": servicio, "valoracion": "&#9733;&#9733;&#9733;&#9733;&#9734;", "edad": 28},
-        {"nombre": "María Gómez", "servicio": servicio, "valoracion": "&#9733;&#9733;&#9733;&#9733;&#9733;", "edad": 32},
-        {"nombre": "Pedro Ramírez", "servicio": servicio, "valoracion": "&#9733;&#9733;&#9733;&#9734;&#9734;", "edad": 24},
+        {"nombre": "Juan Pérez", "servicio": servicio, "valoracion": "&#9733;&#9733;&#9733;&#9733;&#9734;", "edad": 28, "comunas": ["Providencia","Ñuñoa"]},
+        {"nombre": "María Gómez", "servicio": servicio, "valoracion": "&#9733;&#9733;&#9733;&#9733;&#9733;", "edad": 32, "comunas": ["Las Condes","Providencia"]},
+        {"nombre": "Pedro Ramírez", "servicio": servicio, "valoracion": "&#9733;&#9733;&#9733;&#9734;&#9734;", "edad": 24, "comunas": ["Maipú","Santiago"]},
     ]
     comuna_actual = st.session_state.get("ubicacion", "").split(",")[0]
-    mostrados = [r for r in resultados if comuna_actual in (r.get("comunas", []) or [])]
+    mostrados = [r for r in resultados if comuna_actual in r.get("comunas", [])]
     if not mostrados:
         mostrados = resultados
     for r in mostrados:
@@ -285,7 +307,7 @@ elif st.session_state.page == "resultados":
             st.session_state.perfil_usuario = r
             set_page("perfil_publico")
 
-# ---------- PERFIL PÚBLICO (otro usuario) ----------
+# ---------- PERFIL PÚBLICO ----------
 elif st.session_state.page == "perfil_publico":
     r = st.session_state.get("perfil_usuario", {"nombre": "Usuario", "edad": "-", "servicio": "-", "valoracion": "—"})
     st.markdown(f'<h1 class="conecta-title">👤 Perfil de {r["nombre"]}</h1>', unsafe_allow_html=True)
@@ -298,7 +320,6 @@ elif st.session_state.page == "perfil_publico":
     mensaje = st.text_input("Escribe un mensaje...", key="profile_msg")
     if st.button("Enviar mensaje (perfil)"):
         if mensaje.strip():
-            # futura integración: guardar mensaje y notificar
             st.success("Mensaje enviado correctamente ✅")
         else:
             st.warning("No puedes enviar un mensaje vacío.")
@@ -307,9 +328,9 @@ elif st.session_state.page == "perfil_publico":
 elif st.session_state.page == "chats":
     st.markdown('<h1 class="conecta-title">💬 Chats</h1>', unsafe_allow_html=True)
     if st.session_state.user_id == 0:
-        require_login()
+        require_login("login")
     else:
-        # lista de usuarios (todos menos yo)
+        # usuarios disponibles para chatear (DB)
         conn = db.get_conn()
         cur = conn.cursor()
         cur.execute("SELECT id, nombre FROM users WHERE id != ?", (st.session_state.user_id,))
@@ -325,7 +346,6 @@ elif st.session_state.page == "chats":
             receptor_id = receptor["id"]
             st.subheader(f"Chat con {selected}")
 
-            # mostrar mensajes desde BD
             mensajes = db.get_messages_between(st.session_state.user_id, receptor_id)
             if mensajes:
                 for m in mensajes:
@@ -335,13 +355,11 @@ elif st.session_state.page == "chats":
             else:
                 st.info("No hay mensajes aún. Escribe el primero.")
 
-            # enviar nuevo mensaje
             with st.form("send_msg_form", clear_on_submit=True):
                 nuevo = st.text_input("Escribe un mensaje", key="new_msg")
                 if st.form_submit_button("Enviar"):
                     if nuevo and nuevo.strip():
                         db.add_message(st.session_state.user_id, receptor_id, nuevo.strip())
-                        # crear notificación para receptor
                         db.add_notification(receptor_id, "mensaje", f"Nuevo mensaje de {db.get_user_by_id(st.session_state.user_id)['nombre']}")
                         st.success("Mensaje enviado")
                         st.experimental_rerun()
@@ -352,7 +370,7 @@ elif st.session_state.page == "chats":
 elif st.session_state.page == "notificaciones":
     st.markdown('<h1 class="conecta-title">🔔 Notificaciones</h1>', unsafe_allow_html=True)
     if st.session_state.user_id == 0:
-        require_login()
+        require_login("login")
     else:
         notifs = db.get_notifications(st.session_state.user_id)
         if notifs:
@@ -370,7 +388,7 @@ elif st.session_state.page == "notificaciones":
 elif st.session_state.page == "perfil":
     st.markdown('<h1 class="conecta-title">👤 Mi Perfil</h1>', unsafe_allow_html=True)
     if st.session_state.user_id == 0:
-        require_login()
+        require_login("login")
     else:
         user = db.get_user_by_id(st.session_state.user_id)
         if not user:
@@ -393,7 +411,7 @@ elif st.session_state.page == "perfil":
                     st.success("Perfil actualizado correctamente")
                     st.experimental_rerun()
 
-# Fallback: si la página no coincide con ninguna, ir a inicio
+# fallback
 else:
     set_page("inicio")
     st.experimental_rerun()
