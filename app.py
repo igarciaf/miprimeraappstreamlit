@@ -10,7 +10,6 @@ st.set_page_config(page_title="Conecta", page_icon="🤝", layout="wide")
 # -------------------------
 # BOTÓN FIJO "INICIO" ARRIBA (no modifica la app, solo añade el botón)
 # -------------------------
-# Este bloque muestra un botón fijo arriba a la derecha que apunta a ?pagina=inicio
 st.markdown(
     """
     <style>
@@ -41,7 +40,7 @@ st.markdown(
 )
 
 # -------------------------
-# Si la URL trae ?pagina=... la respetamos (permite que el logo vuelva al inicio)
+# Si la URL trae ?pagina=... la respetamos
 # -------------------------
 query_params = st.experimental_get_query_params()
 if "pagina" in query_params:
@@ -61,11 +60,8 @@ if "ubicacion" not in st.session_state:
 if "perfil_usuario" not in st.session_state:
     st.session_state.perfil_usuario = None
 
-# historial de mensajes (lista de dicts: {"autor": "...", "texto": "...", "hora": "HH:MM"})
 if "mensajes_chat" not in st.session_state:
     st.session_state.mensajes_chat = []
-
-# campo controlado para el input del chat
 if "msg_input" not in st.session_state:
     st.session_state.msg_input = ""
 
@@ -210,6 +206,24 @@ def send_chat_message():
 # RENDER TOPBAR
 # -------------------------
 render_topbar()
+
+# -------------------------
+# BARRA LATERAL DE NAVEGACIÓN
+# -------------------------
+with st.sidebar:
+    st.markdown("### 🌐 Navegación")
+    sidebar_choice = st.radio("", ("Inicio", "Chats", "Notificaciones", "Perfil"))
+    # mapeo a las claves que usa el resto del código
+    mapping = {
+        "Inicio": "inicio",
+        "Chats": "chats",
+        "Notificaciones": "notificaciones",
+        "Perfil": "perfil_usuario"
+    }
+    target = mapping.get(sidebar_choice, "inicio")
+    # actualizar la página si es distinta
+    if target != st.session_state.pagina:
+        set_page(target)
 
 # -------------------------
 # PANTALLAS
