@@ -1,55 +1,26 @@
 # auth.py
-import streamlit as st
 import hashlib
 import db
-
+from typing import Optional, Dict
 
 def hash_password(password: str) -> str:
-    """Genera un hash SHA-256 de la contraseña"""
-    return hashlib.sha256(password.encode()).hexdigest()
+    return hashlib.sha256(password.encode("utf-8")).hexdigest()
 
-
-def register_user(nombre, email, password, bio=None, comuna=None):
-    """Registra un nuevo usuario si no existe"""
+def register_user(nombre: str, email: str, password: str, bio: str = "", comuna: str = "") -> int:
+    # validaciones mínimas (la UI puede mostrar mensajes)
     if not nombre or not email or not password:
-        st.error("Por favor completa todos los campos obligatorios.")
-        return
+        return 0
+    # si ya existe
+    if db.get_user_by_email(email):
+        return 0
+    pwd_hash = hash_password(password)
+    user_id = db.create_user(nombre, email, pwd_hash, bio, comuna)
+    return user_id
 
-    existing_user = db.get_user_by_email(email)
-    if existing_user:
-        st.warning("Ya existe un usuario registrado con ese correo.")
-        return
-
-    password_hash = hash_password(password)
-    db.create_user(nombre, email, password_hash, bio, comuna)
-    st.success("Registro exitoso ✅. Ahora puedes iniciar sesión.")
-
-
-def login_user(email, password):
-    """Verifica las credenciales del usuario"""
+def login_user(email: str, password: str) -> Optional[Dict]:
     user = db.get_user_by_email(email)
     if not user:
-        st.error("Usuario no encontrado.")
         return None
-
-    password_hash = hash_password(password)
-    if user[3] == password_hash:  # password_hash está en la posición 3
-        st.session_state["user"] = {
-            "id": user[0],
-            "nombre": user[1],
-            "email": user[2],
-            "bio": user[4],
-            "comuna": user[5],
-        }
-        st.success(f"Bienvenido {user[1]} 👋")
+    if hash_password(password) == user["password_hash"]:
         return user
-    else:
-        st.error("Contraseña incorrecta.")
-        return None
-
-
-def logout_user():
-    """Cierra la sesión actual"""
-    if "user" in st.session_state:
-        del st.session_state["user"]
-        st.success("Sesión cerrada correctamente.")
+    return None
