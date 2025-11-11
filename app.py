@@ -325,3 +325,62 @@ elif st.session_state.page == "perfil":
 # fallback
 else:
     set_page("inicio")
+    # --- Renderizado principal ---
+if st.session_state.user_id:
+    # Si está logueado
+    user = db.get_user_by_id(st.session_state.user_id)
+    st.sidebar.success(f"Conectado como {user['nombre']}")
+    st.sidebar.button("Cerrar sesión", on_click=logout)
+
+    if st.session_state.page == "Inicio":
+        st.title("Inicio")
+        st.write("Bienvenido a la plataforma. Aquí puedes buscar y ofrecer servicios.")
+        st.button("Ver servicios", on_click=lambda: set_page("Servicios"))
+        st.button("Ir al chat", on_click=lambda: set_page("Chat"))
+
+    elif st.session_state.page == "Servicios":
+        st.title("Explorar servicios")
+        st.write("Aquí podrás ver todos los servicios disponibles.")
+
+    elif st.session_state.page == "Chat":
+        st.title("Chat")
+        st.write("Funcionalidad de chat próximamente.")
+    
+else:
+    # Si NO está logueado
+    st.sidebar.info("Inicia sesión o regístrate para continuar")
+    if st.session_state.page == "Inicio":
+        st.title("Conecta App")
+        st.write("Plataforma para conectar personas que ofrecen y buscan servicios.")
+        st.button("Iniciar sesión", on_click=lambda: set_page("Login"))
+        st.button("Registrarse", on_click=lambda: set_page("Registro"))
+
+    elif st.session_state.page == "Login":
+        st.title("Iniciar sesión")
+        email = st.text_input("Correo")
+        password = st.text_input("Contraseña", type="password")
+        if st.button("Entrar"):
+            user_id = auth.login_user(email, password)
+            if user_id:
+                st.session_state.user_id = user_id
+                set_page("Inicio")
+                st.success("Inicio de sesión correcto")
+            else:
+                st.error("Credenciales incorrectas")
+
+    elif st.session_state.page == "Registro":
+        st.title("Crear cuenta")
+        nombre = st.text_input("Nombre completo")
+        email = st.text_input("Correo electrónico")
+        password = st.text_input("Contraseña", type="password")
+        bio = st.text_area("Descripción personal (opcional)")
+        comuna = st.text_input("Comuna (opcional)")
+        if st.button("Registrar"):
+            user_id = auth.register_user(nombre, email, password, bio, comuna)
+            if user_id:
+                st.session_state.user_id = user_id
+                set_page("Inicio")
+                st.success("Cuenta creada correctamente")
+            else:
+                st.error("Ya existe un usuario con ese correo.")
+
