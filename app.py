@@ -3,6 +3,24 @@ import streamlit as st
 from datetime import datetime
 import db
 import auth
+import streamlit as st
+import auth
+import db
+
+# --- Inicializar la sesión ---
+if "user_id" not in st.session_state:
+    st.session_state.user_id = None
+if "page" not in st.session_state:
+    st.session_state.page = "Inicio"
+
+# --- Función para cambiar de página ---
+def set_page(page_name):
+    st.session_state.page = page_name
+
+# --- Función para cerrar sesión ---
+def logout():
+    st.session_state.user_id = None
+    set_page("Inicio")
 
 # Inicializar BD
 auth.init()
