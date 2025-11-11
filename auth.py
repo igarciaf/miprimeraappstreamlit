@@ -2,7 +2,6 @@
 import bcrypt
 import db
 
-# inicializar BD (asegura que tablas existan)
 def init():
     db.init_db()
 
@@ -16,9 +15,9 @@ def verify_password(password: str, password_hash: str) -> bool:
         return False
 
 def register_user(nombre: str, email: str, password: str, bio: str = "", comuna: str = "") -> int:
-    # validar si ya existe
+    # Validar si ya existe
     if db.get_user_by_email(email):
-        return 0
+        return 0  # usuario ya existe
     pwd_hash = hash_password(password)
     user_id = db.create_user(nombre, email, pwd_hash, bio, comuna)
     return user_id
