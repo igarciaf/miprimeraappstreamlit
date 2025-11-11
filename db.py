@@ -1,16 +1,48 @@
-def create_user(nombre: str, email: str, password_hash: str, bio: Optional[str]=None, comuna: Optional[str]=None) -> int:
-    conn = get_conn()
-    cur = conn.cursor()
-    created_at = datetime.utcnow().isoformat()
-    try:
-        cur.execute(
-            "INSERT INTO users (nombre, email, password_hash, bio, comuna, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-            (nombre, email, password_hash, bio, comuna, created_at)
+# db.py
+from typing import Optional
+import sqlite3
+
+# Nombre de la base de datos local
+DB_NAME = "usuarios.db"
+
+
+def init_db():
+    """Inicializa la base de datos si no existe"""
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS usuarios (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nombre TEXT NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            bio TEXT,
+            comuna TEXT
         )
-        conn.commit()
-        user_id = cur.lastrowid
-    except sqlite3.IntegrityError as e:
-        print("❌ Error al crear usuario:", e)
-        user_id = 0
+    """)
+    conn.commit()
+    conn.close()
+
+
+def create_user(nombre: str, email: str, password_hash: str, bio: Optional[str] = None, comuna: Optional[str] = None) -> int:
+    """Crea un nuevo usuario en la base de datos"""
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO usuarios (nombre, email, password_hash, bio, comuna)
+        VALUES (?, ?, ?, ?, ?)
+    """, (nombre, email, password_hash, bio, comuna))
+    conn.commit()
+    user_id = cursor.lastrowid
     conn.close()
     return user_id
+
+
+def get_user_by_email(email: str):
+    """Obtiene un usuario por su correo electrónico"""
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM usuarios WHERE email = ?", (email,))
+    user = cursor.fetchone()
+    conn.close()
+    return user
