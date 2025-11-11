@@ -1,31 +1,55 @@
 # auth.py
-import bcrypt
+import streamlit as st
+import hashlib
 import db
 
-def init():
-    db.init_db()
 
 def hash_password(password: str) -> str:
-    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    """Genera un hash SHA-256 de la contraseña"""
+    return hashlib.sha256(password.encode()).hexdigest()
 
-def verify_password(password: str, password_hash: str) -> bool:
-    try:
-        return bcrypt.checkpw(password.encode('utf-8'), password_hash.encode('utf-8'))
-    except Exception:
-        return False
 
-def register_user(nombre: str, email: str, password: str, bio: str = "", comuna: str = "") -> int:
-    # Validar si ya existe
-    if db.get_user_by_email(email):
-        return 0  # usuario ya existe
-    pwd_hash = hash_password(password)
-    user_id = db.create_user(nombre, email, pwd_hash, bio, comuna)
-    return user_id
+def register_user(nombre, email, password, bio=None, comuna=None):
+    """Registra un nuevo usuario si no existe"""
+    if not nombre or not email or not password:
+        st.error("Por favor completa todos los campos obligatorios.")
+        return
 
-def login_user(email: str, password: str) -> int:
+    existing_user = db.get_user_by_email(email)
+    if existing_user:
+        st.warning("Ya existe un usuario registrado con ese correo.")
+        return
+
+    password_hash = hash_password(password)
+    db.create_user(nombre, email, password_hash, bio, comuna)
+    st.success("Registro exitoso ✅. Ahora puedes iniciar sesión.")
+
+
+def login_user(email, password):
+    """Verifica las credenciales del usuario"""
     user = db.get_user_by_email(email)
     if not user:
-        return 0
-    if verify_password(password, user["password_hash"]):
-        return user["id"]
-    return 0
+        st.error("Usuario no encontrado.")
+        return None
+
+    password_hash = hash_password(password)
+    if user[3] == password_hash:  # password_hash está en la posición 3
+        st.session_state["user"] = {
+            "id": user[0],
+            "nombre": user[1],
+            "email": user[2],
+            "bio": user[4],
+            "comuna": user[5],
+        }
+        st.success(f"Bienvenido {user[1]} 👋")
+        return user
+    else:
+        st.error("Contraseña incorrecta.")
+        return None
+
+
+def logout_user():
+    """Cierra la sesión actual"""
+    if "user" in st.session_state:
+        del st.session_state["user"]
+        st.success("Sesión cerrada correctamente.")
