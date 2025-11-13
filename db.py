@@ -14,6 +14,7 @@ def get_conn():
 def init_db():
     conn = get_conn()
     cur = conn.cursor()
+    # users
     cur.execute("""
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -22,10 +23,23 @@ def init_db():
         password_hash TEXT NOT NULL,
         bio TEXT,
         comuna TEXT,
-        servicios TEXT,
         created_at TEXT
     )
     """)
+    # services (publicaciones)
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS services (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        category TEXT NOT NULL,
+        service TEXT NOT NULL,
+        comuna TEXT,
+        price REAL,
+        created_at TEXT,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+    """)
+    # messages
     cur.execute("""
     CREATE TABLE IF NOT EXISTS messages (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -37,6 +51,7 @@ def init_db():
         FOREIGN KEY (receptor_id) REFERENCES users(id)
     )
     """)
+    # notifications
     cur.execute("""
     CREATE TABLE IF NOT EXISTS notifications (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -51,14 +66,15 @@ def init_db():
     conn.commit()
     conn.close()
 
-def create_user(nombre: str, email: str, password_hash: str, bio: Optional[str]=None, comuna: Optional[str]=None, servicios: Optional[str]=None) -> int:
+# --- Users ---
+def create_user(nombre: str, email: str, password_hash: str, bio: Optional[str]=None, comuna: Optional[str]=None) -> int:
     conn = get_conn()
     cur = conn.cursor()
     created_at = datetime.utcnow().isoformat()
     try:
         cur.execute(
-            "INSERT INTO users (nombre, email, password_hash, bio, comuna, servicios, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (nombre, email, password_hash, bio, comuna, servicios, created_at)
+            "INSERT INTO users (nombre, email, password_hash, bio, comuna, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (nombre, email, password_hash, bio, comuna, created_at)
         )
         conn.commit()
         user_id = cur.lastrowid
@@ -83,7 +99,7 @@ def get_user_by_id(user_id: int) -> Optional[Dict]:
     conn.close()
     return dict(row) if row else None
 
-def update_user_profile(user_id: int, nombre: str=None, bio: str=None, comuna: str=None, servicios: str=None):
+def update_user_profile(user_id: int, nombre: str=None, bio: str=None, comuna: str=None):
     conn = get_conn()
     cur = conn.cursor()
     if nombre is not None:
@@ -92,21 +108,57 @@ def update_user_profile(user_id: int, nombre: str=None, bio: str=None, comuna: s
         cur.execute("UPDATE users SET bio = ? WHERE id = ?", (bio, user_id))
     if comuna is not None:
         cur.execute("UPDATE users SET comuna = ? WHERE id = ?", (comuna, user_id))
-    if servicios is not None:
-        cur.execute("UPDATE users SET servicios = ? WHERE id = ?", (servicios, user_id))
     conn.commit()
     conn.close()
 
-def search_users_by_service(service_query: str) -> List[Dict]:
+# --- Services ---
+def add_service(user_id: int, category: str, service: str, comuna: Optional[str]=None, price: Optional[float]=None) -> int:
     conn = get_conn()
     cur = conn.cursor()
-    like_query = f"%{service_query.lower()}%"
-    cur.execute("SELECT * FROM users WHERE LOWER(IFNULL(servicios,'')) LIKE ?", (like_query,))
+    created_at = datetime.utcnow().isoformat()
+    cur.execute(
+        "INSERT INTO services (user_id, category, service, comuna, price, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+        (user_id, category, service, comuna, price, created_at)
+    )
+    conn.commit()
+    sid = cur.lastrowid
+    conn.close()
+    return sid
+
+def get_user_services(user_id: int) -> List[Dict]:
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM services WHERE user_id = ? ORDER BY id DESC", (user_id,))
     rows = cur.fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
-# Mensajes / Notificaciones (si ya las usas)
+def get_services_filtered(term: str, comuna: Optional[str]=None) -> List[Dict]:
+    conn = get_conn()
+    cur = conn.cursor()
+    term_like = f"%{term}%"
+    if comuna:
+        cur.execute("""
+            SELECT s.*, u.nombre as user_nombre, u.comuna as user_comuna, u.bio as user_bio
+            FROM services s
+            JOIN users u ON s.user_id = u.id
+            WHERE (LOWER(s.service) LIKE LOWER(?) OR LOWER(s.category) LIKE LOWER(?))
+              AND (s.comuna = ?)
+            ORDER BY s.id DESC
+        """, (term_like, term_like, comuna))
+    else:
+        cur.execute("""
+            SELECT s.*, u.nombre as user_nombre, u.comuna as user_comuna, u.bio as user_bio
+            FROM services s
+            JOIN users u ON s.user_id = u.id
+            WHERE (LOWER(s.service) LIKE LOWER(?) OR LOWER(s.category) LIKE LOWER(?))
+            ORDER BY s.id DESC
+        """, (term_like, term_like))
+    rows = cur.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+# --- Messages ---
 def add_message(emisor_id: int, receptor_id: int, contenido: str):
     conn = get_conn()
     cur = conn.cursor()
@@ -128,6 +180,7 @@ def get_messages_between(user_a: int, user_b: int) -> List[Dict]:
     conn.close()
     return [dict(r) for r in rows]
 
+# --- Notifications ---
 def add_notification(usuario_id: int, tipo: str, mensaje: str):
     conn = get_conn()
     cur = conn.cursor()
