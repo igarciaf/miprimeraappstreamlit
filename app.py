@@ -177,47 +177,52 @@ opciones_map = {
 # ============================
 #        PÁGINA DE INICIO
 # ============================
+# PÁGINA DE INICIO
 if st.session_state.get("page") == "inicio":
+
     st.markdown('<h1 class="conecta-title">🤝 Conecta</h1>', unsafe_allow_html=True)
     st.write("Encuentra personas que ofrecen los servicios que necesitas.")
     st.subheader("Selecciona una categoría:")
 
     c1, c2 = st.columns(2)
 
-    # ---- BOTONES ARREGLADOS (SIN rerun_safe) ----
-with c1:
-    if st.button("Cuidado de mascotas", key="btn_mascotas"):
-        st.session_state.categoria = "Mascotas"
-        st.session_state.page = "subcategoria"
-        rerun_safe()
+    # ---- BOTONES CORREGIDOS DENTRO DE INICIO ----
+    with c1:
+        if st.button("Cuidado de mascotas", key="btn_mascotas"):
+            st.session_state.categoria = "Mascotas"
+            st.session_state.page = "subcategoria"
+            rerun_safe()
 
-    if st.button("Limpieza y hogar", key="btn_hogar"):
-        st.session_state.categoria = "Hogar"
-        st.session_state.page = "subcategoria"
-        rerun_safe()
+        if st.button("Limpieza y hogar", key="btn_hogar"):
+            st.session_state.categoria = "Hogar"
+            st.session_state.page = "subcategoria"
+            rerun_safe()
 
-with c2:
-    if st.button("Clases particulares", key="btn_clases"):
-        st.session_state.categoria = "Clases"
-        st.session_state.page = "subcategoria"
-        rerun_safe()
+    with c2:
+        if st.button("Clases particulares", key="btn_clases"):
+            st.session_state.categoria = "Clases"
+            st.session_state.page = "subcategoria"
+            rerun_safe()
 
-    if st.button("Cuidado de niños", key="btn_ninos"):
-        st.session_state.categoria = "Niños"
-        st.session_state.page = "subcategoria"
-        rerun_safe()
-
+        if st.button("Cuidado de niños", key="btn_ninos"):
+            st.session_state.categoria = "Niños"
+            st.session_state.page = "subcategoria"
+            rerun_safe()
 
     st.markdown("---")
     st.subheader("Buscar por servicio")
+
     termino = st.text_input("¿Qué servicio necesitas?", key="search_term")
     comuna_filter = st.selectbox("Filtrar por comuna (opcional):", [""] + comunas_santiago, key="search_comuna")
+
     if st.button("Buscar"):
         if termino and termino.strip():
             comuna_sel = comuna_filter if comuna_filter else None
             servicios = db.get_services_filtered(termino.strip(), comuna_sel)
+
             if servicios:
                 st.success(f"{len(servicios)} resultado(s) encontrados")
+
                 for s in servicios:
                     st.markdown(
                         f'<div class="service-card"><b>{s["service"]}</b> — {s["category"]} <br>'
@@ -226,14 +231,17 @@ with c2:
                         f'<i>{s.get("user_bio") or ""}</i></div>',
                         unsafe_allow_html=True
                     )
+
                     if st.button(f"Chatear con {s['user_nombre']}", key=f"chat_service_{s['id']}"):
                         st.session_state.selected_user_id = s["user_id"]
                         st.session_state.page = "chats"
                         rerun_safe()
+
             else:
                 st.warning("No se encontraron servicios con ese término.")
         else:
             st.warning("Ingresa un término para buscar.")
+
 
 # FIN DE LA PÁGINA DE INICIO
 
