@@ -235,13 +235,22 @@ with c2:
         else:
             st.warning("Ingresa un término para buscar.")
 
+# FIN DE LA PÁGINA DE INICIO
+
 # SUBCATEGORIA
-elif st.session_state.get("page") == "subcategoria":
-    st.markdown(f'<h1 class="conecta-title">Categoría: {st.session_state.get("categoria")}</h1>', unsafe_allow_html=True)
+if st.session_state.get("page") == "subcategoria":
+
+    st.markdown(
+        f'<h1 class="conecta-title">Categoría: {st.session_state.get("categoria")}</h1>',
+        unsafe_allow_html=True
+    )
+
     if st.button("⬅️ Volver"):
         st.session_state.page = "inicio"
         rerun_safe()
+
     lista = opciones_map.get(st.session_state.get("categoria"), [])
+
     if lista:
         cols_per_row = 3
         for i in range(0, len(lista), cols_per_row):
