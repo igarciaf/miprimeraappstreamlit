@@ -7,10 +7,9 @@ def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode("utf-8")).hexdigest()
 
 def register_user(nombre: str, email: str, password: str, bio: str = "", comuna: str = "") -> int:
-    # validaciones mínimas (la UI puede mostrar mensajes)
+    """Devuelve id nuevo o 0 si falla (usuario existe o falta info)."""
     if not nombre or not email or not password:
         return 0
-    # si ya existe
     if db.get_user_by_email(email):
         return 0
     pwd_hash = hash_password(password)
