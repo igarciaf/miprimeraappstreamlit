@@ -92,6 +92,8 @@ def get_user_by_email(email: str) -> Optional[Dict]:
     return dict(row) if row else None
 
 def get_user_by_id(user_id: int) -> Optional[Dict]:
+    if not user_id:
+        return None
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("SELECT * FROM users WHERE id = ?", (user_id,))
@@ -126,6 +128,8 @@ def add_service(user_id: int, category: str, service: str, comuna: Optional[str]
     return sid
 
 def get_user_services(user_id: int) -> List[Dict]:
+    if not user_id:
+        return []
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("SELECT * FROM services WHERE user_id = ? ORDER BY id DESC", (user_id,))
@@ -160,6 +164,8 @@ def get_services_filtered(term: str, comuna: Optional[str]=None) -> List[Dict]:
 
 # --- Messages ---
 def add_message(emisor_id: int, receptor_id: int, contenido: str):
+    if not emisor_id or not receptor_id:
+        return
     conn = get_conn()
     cur = conn.cursor()
     timestamp = datetime.utcnow().isoformat()
@@ -169,6 +175,8 @@ def add_message(emisor_id: int, receptor_id: int, contenido: str):
     conn.close()
 
 def get_messages_between(user_a: int, user_b: int) -> List[Dict]:
+    if not user_a or not user_b:
+        return []
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("""
@@ -182,6 +190,8 @@ def get_messages_between(user_a: int, user_b: int) -> List[Dict]:
 
 # --- Notifications ---
 def add_notification(usuario_id: int, tipo: str, mensaje: str):
+    if not usuario_id:
+        return
     conn = get_conn()
     cur = conn.cursor()
     fecha = datetime.utcnow().isoformat()
@@ -191,6 +201,8 @@ def add_notification(usuario_id: int, tipo: str, mensaje: str):
     conn.close()
 
 def get_notifications(usuario_id: int, only_unread: bool=False):
+    if not usuario_id:
+        return []
     conn = get_conn()
     cur = conn.cursor()
     if only_unread:
