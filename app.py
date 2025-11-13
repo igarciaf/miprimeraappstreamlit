@@ -158,34 +158,34 @@ opciones_map = {
     "Niños": ["Cuidado por horas", "Apoyo escolar", "Actividades recreativas", "Acompañamiento", "Transporte escolar"]
 }
 
-# -------------------------
-# PAGES
-# -------------------------
-
-# INICIO
+# ============================
+#        PÁGINA DE INICIO
+# ============================
 if st.session_state.get("page") == "inicio":
     st.markdown('<h1 class="conecta-title">🤝 Conecta</h1>', unsafe_allow_html=True)
     st.write("Encuentra personas que ofrecen los servicios que necesitas.")
     st.subheader("Selecciona una categoría:")
+
     c1, c2 = st.columns(2)
+
+    # ---- BOTONES ARREGLADOS (SIN rerun_safe) ----
     with c1:
-        if st.button("Cuidado de mascotas"):
+        if st.button("Cuidado de mascotas", key="btn_mascotas"):
             st.session_state.categoria = "Mascotas"
             st.session_state.page = "subcategoria"
-            rerun_safe()
-        if st.button("Limpieza y hogar"):
+
+        if st.button("Limpieza y hogar", key="btn_hogar"):
             st.session_state.categoria = "Hogar"
             st.session_state.page = "subcategoria"
-            rerun_safe()
+
     with c2:
-        if st.button("Clases particulares"):
+        if st.button("Clases particulares", key="btn_clases"):
             st.session_state.categoria = "Clases"
             st.session_state.page = "subcategoria"
-            rerun_safe()
-        if st.button("Cuidado de niños"):
+
+        if st.button("Cuidado de niños", key="btn_ninos"):
             st.session_state.categoria = "Niños"
             st.session_state.page = "subcategoria"
-            rerun_safe()
 
     st.markdown("---")
     st.subheader("Buscar por servicio")
