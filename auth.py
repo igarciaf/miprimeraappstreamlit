@@ -1,25 +1,29 @@
-# auth.py
-import hashlib
+import bcrypt
 import db
-from typing import Optional, Dict
+
+def init():
+    db.init_db()
 
 def hash_password(password: str) -> str:
-    return hashlib.sha256(password.encode("utf-8")).hexdigest()
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
-def register_user(nombre: str, email: str, password: str, bio: str = "", comuna: str = "") -> int:
-    """Devuelve id nuevo o 0 si falla (usuario existe o falta info)."""
-    if not nombre or not email or not password:
-        return 0
+def verify_password(password: str, password_hash: str) -> bool:
+    try:
+        return bcrypt.checkpw(password.encode('utf-8'), password_hash.encode('utf-8'))
+    except Exception:
+        return False
+
+def register_user(nombre: str, email: str, password: str, bio: str = "", comuna: str = "", servicios: str = "") -> int:
     if db.get_user_by_email(email):
         return 0
     pwd_hash = hash_password(password)
-    user_id = db.create_user(nombre, email, pwd_hash, bio, comuna)
+    user_id = db.create_user(nombre, email, pwd_hash, bio, comuna, servicios)
     return user_id
 
-def login_user(email: str, password: str) -> Optional[Dict]:
+def login_user(email: str, password: str) -> int:
     user = db.get_user_by_email(email)
     if not user:
-        return None
-    if hash_password(password) == user["password_hash"]:
-        return user
-    return None
+        return 0
+    if verify_password(password, user["password_hash"]):
+        return user["id"]
+    return 0
