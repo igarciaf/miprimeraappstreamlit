@@ -4,24 +4,19 @@ import db
 import auth
 from datetime import datetime
 
-# Inicializar DB (crea tablas si no existen)
+# Inicializar DB
 db.init_db()
 
-# Configuración de página
 st.set_page_config(page_title="Conecta", page_icon="🤝", layout="wide")
 
-# -------------------------
-# rerun seguro (compatibilidad)
-# -------------------------
+# rerun seguro
 def rerun_safe():
     if hasattr(st, "rerun"):
         st.rerun()
     else:
         st.experimental_rerun()
 
-# -------------------------
-# session_state defaults
-# -------------------------
+# session defaults
 defaults = {
     "page": "inicio",
     "user_id": 0,
@@ -30,12 +25,15 @@ defaults = {
     "servicio": None,
     "ubicacion": None,
     "perfil_usuario": None,
-    "selected_user_id": None
+    "selected_user_id": None,
+    # flags para publicar servicio
+    "publish_cat": None,
+    "publish_service": None
 }
 for k, v in defaults.items():
     st.session_state.setdefault(k, v)
 
-# Lista comunas (completa)
+# comunas (misma lista que antes)
 comunas_santiago = [
     "Cerrillos","Cerro Navia","Conchalí","El Bosque","Estación Central","Huechuraba",
     "Independencia","La Cisterna","La Florida","La Granja","La Pintana","La Reina",
@@ -47,9 +45,7 @@ comunas_santiago = [
     "María Pinto","Curacaví","Talagante","El Monte","Padre Hurtado","Peñaflor"
 ]
 
-# -------------------------
-# NAV HELPERS
-# -------------------------
+# helpers
 def set_page(page_name: str):
     st.session_state.page = page_name
     rerun_safe()
@@ -68,53 +64,57 @@ def require_login(redirect_to="login"):
     if st.button("Ir a Iniciar sesión"):
         set_page(redirect_to)
 
-# -------------------------
-# TOPBAR + HOME BUTTON
-# -------------------------
-st.markdown(
-    """
+# topbar + home button
+st.markdown("""
     <style>
-    .top-bar{
-        position:fixed; top:0; left:0; right:0; height:64px;
-        background:#2E8B57; color:white; display:flex; align-items:center; justify-content:center;
-        font-size:22px; font-weight:700; z-index:9999; box-shadow:0 2px 8px rgba(0,0,0,0.08);
-    }
+    .top-bar{position:fixed; top:0; left:0; right:0; height:64px;
+    background:#2E8B57; color:white; display:flex; align-items:center; justify-content:center;
+    font-size:22px; font-weight:700; z-index:9999; box-shadow:0 2px 8px rgba(0,0,0,0.08);}
     .main > div { margin-top: 90px; margin-bottom: 40px; }
     </style>
     <div class="top-bar">ConectaServicios</div>
-    """, unsafe_allow_html=True
-)
-# Home button (Streamlit) para evitar conflictos con query params
+    """, unsafe_allow_html=True)
+
 if st.button("🏠 Inicio", key="home_btn"):
     set_page("inicio")
 
-# -------------------------
-# SIDEBAR (navegación + cerrar sesión)
-# -------------------------
+# sidebar navigation (no forzar páginas internas)
+pages_display = ["Inicio", "Iniciar sesión", "Registrarse", "Perfil", "Chats", "Notificaciones"]
+pages_map = {
+    "Inicio": "inicio",
+    "Iniciar sesión": "login",
+    "Registrarse": "registro",
+    "Perfil": "perfil",
+    "Chats": "chats",
+    "Notificaciones": "notificaciones"
+}
 with st.sidebar:
     st.markdown("### 🌐 Navegación")
     if st.session_state.user:
         st.markdown(f"**{st.session_state.user.get('nombre')}**")
     else:
         st.markdown("**Invitado**")
-    page = st.radio("Ir a:", ["Inicio","Iniciar sesión","Registrarse","Perfil","Chats","Notificaciones"], index=0)
-    # map radio to internal pages
-    page_map = {
-        "Inicio":"inicio", "Iniciar sesión":"login", "Registrarse":"registro",
-        "Perfil":"perfil", "Chats":"chats", "Notificaciones":"notificaciones"
-    }
-    target = page_map.get(page, "inicio")
-    # Cambio de página desde la sidebar (si es distinto)
-    if target != st.session_state.page and st.session_state.page in ["inicio","login","registro","perfil","chats","notificaciones"]:
-        set_page(target)
+    # radio safe
+    current_label = None
+    for label, key in pages_map.items():
+        if key == st.session_state.page:
+            current_label = label
+            break
+    if current_label is None:
+        current_label = "Inicio"
+    sel_index = pages_display.index(current_label) if current_label in pages_display else 0
+    selection = st.radio("Ir a:", pages_display, index=sel_index)
+    selected_page = pages_map.get(selection, "inicio")
+    if st.session_state.page in pages_map.values():
+        if selected_page != st.session_state.page:
+            set_page(selected_page)
+
     st.markdown("---")
     if st.session_state.user:
         if st.button("🚪 Cerrar sesión"):
             logout()
 
-# -------------------------
-# Estilos
-# -------------------------
+# estilos
 st.markdown("""
     <style>
     div.stButton > button { height:76px; width:200px; background:#2E8B57; color:white; border-radius:12px; font-size:17px; margin:6px 8px; border:none; }
@@ -124,11 +124,20 @@ st.markdown("""
     .chat-right { background:#DCF8C6; text-align:right; float:right; clear:both; }
     .chat-left { background:#F1F0F0; text-align:left; float:left; clear:both; }
     .chat-time { font-size:10px; color:#666; margin-top:4px; display:block; }
+    .service-card { border:1px solid rgba(0,0,0,0.06); padding:12px; border-radius:8px; margin-bottom:10px; }
     </style>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
+
+# opciones y mapas de subcategorías (reutilizables)
+opciones_map = {
+    "Mascotas": ["Pasear perros", "Cuidar gatos", "Aseo de mascotas", "Adiestramiento", "Cuidado nocturno"],
+    "Hogar": ["Limpieza general", "Cuidado de jardín", "Arreglo básico", "Electricidad", "Pintura", "Gasfitería"],
+    "Clases": ["Matemáticas", "Inglés", "Música", "Computación", "Arte", "Programación"],
+    "Niños": ["Cuidado por horas", "Apoyo escolar", "Actividades recreativas", "Acompañamiento", "Transporte escolar"]
+}
 
 # -------------------------
-# PAGES
+# PÁGINAS
 # -------------------------
 
 # INICIO
@@ -152,32 +161,32 @@ if st.session_state.page == "inicio":
             st.session_state.categoria = "Niños"
             set_page("subcategoria")
     st.markdown("---")
+
+    # búsqueda por término + opcional filtro comuna
     st.subheader("Buscar por servicio")
     termino = st.text_input("¿Qué servicio necesitas?", key="search_term")
+    comuna_filter = st.selectbox("Filtrar por comuna (opcional):", [""] + comunas_santiago, key="search_comuna")
     if st.button("Buscar"):
         if termino.strip():
-            resultados = db.search_users_by_skill(termino.strip())
-            if resultados:
-                for r in resultados:
-                    st.write(f"**{r['nombre']}** — {r.get('comuna') or 'Sin comuna'}")
-                    st.write(r.get("bio") or "Sin descripción.")
-                    if st.button(f"Chatear con {r['nombre']}", key=f"chat_btn_{r['id']}"):
-                        st.session_state.selected_user_id = r["id"]
+            comuna_selected = comuna_filter if comuna_filter else None
+            servicios = db.get_services_filtered(termino.strip(), comuna_selected)
+            if servicios:
+                st.success(f"{len(servicios)} resultado(s) encontrados")
+                for s in servicios:
+                    st.markdown(f'<div class="service-card"><b>{s["service"]}</b> — {s["category"]} <br>Proveedor: <b>{s["user_nombre"]}</b> — {s.get("user_comuna") or "Sin comuna"}<br>Precio: {(" $"+str(s["price"])) if s.get("price") else "No informado"}<br><i>{s.get("user_bio") or ""}</i></div>', unsafe_allow_html=True)
+                    if st.button(f"Chatear con {s['user_nombre']}", key=f"chat_service_{s['id']}"):
+                        st.session_state.selected_user_id = s["user_id"]
                         set_page("chats")
             else:
-                st.warning("No se encontraron usuarios con ese servicio.")
+                st.warning("No se encontraron servicios con ese término.")
+        else:
+            st.warning("Ingresa un término para buscar.")
 
 # SUBCATEGORIA
 elif st.session_state.page == "subcategoria":
     st.markdown(f'<h1 class="conecta-title">Categoría: {st.session_state.categoria}</h1>', unsafe_allow_html=True)
     if st.button("⬅️ Volver"):
         set_page("inicio")
-    opciones_map = {
-        "Mascotas": ["Pasear perros", "Cuidar gatos", "Aseo de mascotas", "Adiestramiento", "Cuidado nocturno"],
-        "Hogar": ["Limpieza general", "Cuidado de jardín", "Arreglo básico", "Electricidad", "Pintura", "Gasfitería"],
-        "Clases": ["Matemáticas", "Inglés", "Música", "Computación", "Arte", "Programación"],
-        "Niños": ["Cuidado por horas", "Apoyo escolar", "Actividades recreativas", "Acompañamiento", "Transporte escolar"]
-    }
     lista = opciones_map.get(st.session_state.categoria, [])
     if lista:
         cols_per_row = 3
@@ -209,27 +218,21 @@ elif st.session_state.page == "resultados":
     st.markdown(f'<h1 class="conecta-title">Resultados: {servicio} — {ubic}</h1>', unsafe_allow_html=True)
     if st.button("⬅️ Volver"):
         set_page("ubicacion")
-    # simulación de resultados (más adelante conectar tabla propia de servicios)
-    resultados = [
-        {"nombre": "Juan Pérez", "servicio": servicio, "valoracion": "⭐⭐⭐⭐☆", "edad": 28, "comunas": ["Providencia","Ñuñoa"]},
-        {"nombre": "María Gómez", "servicio": servicio, "valoracion": "⭐⭐⭐⭐⭐", "edad": 32, "comunas": ["Las Condes","Providencia"]},
-        {"nombre": "Pedro Ramírez", "servicio": servicio, "valoracion": "⭐⭐★☆☆", "edad": 24, "comunas": ["Maipú","Santiago"]},
-    ]
-    comuna_actual = st.session_state.get("ubicacion", "").split(",")[0]
-    mostrados = [r for r in resultados if comuna_actual in r.get("comunas", [])]
-    if not mostrados:
-        mostrados = resultados
-    rcols = st.columns(2)
-    for i, r in enumerate(mostrados):
-        col = rcols[i % 2]
-        with col:
-            st.markdown(f"**{r['nombre']}** — {r['servicio']}")
-            st.markdown(f"Valoración: {r['valoracion']} — {r['edad']} años")
-            if st.button(f"Ver perfil de {r['nombre']}", key=f"ver_{i}"):
-                st.session_state.perfil_usuario = r
-                set_page("perfil_publico")
 
-# PERFIL PUBLICO
+    # buscar servicios que coincidan con nombre del servicio y comuna (si aplica)
+    term = servicio or ""
+    comuna_name = ubic.split(",")[0] if ubic else None
+    servicios = db.get_services_filtered(term, comuna_name)
+    if servicios:
+        for s in servicios:
+            st.markdown(f'<div class="service-card"><b>{s["service"]}</b> — {s["category"]} <br>Proveedor: <b>{s["user_nombre"]}</b> — {s.get("user_comuna") or "Sin comuna"}<br>Precio: {(" $"+str(s["price"])) if s.get("price") else "No informado"}<br><i>{s.get("user_bio") or ""}</i></div>', unsafe_allow_html=True)
+            if st.button(f"Chatear con {s['user_nombre']}", key=f"chat_result_{s['id']}"):
+                st.session_state.selected_user_id = s["user_id"]
+                set_page("chats")
+    else:
+        st.info("No hay servicios publicados que coincidan (aún).")
+
+# PERFIL PÚBLICO
 elif st.session_state.page == "perfil_publico":
     r = st.session_state.get("perfil_usuario", {"nombre":"Usuario"})
     st.markdown(f'<h1 class="conecta-title">👤 Perfil de {r["nombre"]}</h1>', unsafe_allow_html=True)
@@ -239,32 +242,38 @@ elif st.session_state.page == "perfil_publico":
     st.write(f"**Valoración:** {r.get('valoracion','-')}")
     st.write("**Descripción:** Persona confiable, con experiencia en el servicio (simulación).")
 
-# CHATS (real)
+# CHATS
 elif st.session_state.page == "chats":
     st.markdown('<h1 class="conecta-title">💬 Chats</h1>', unsafe_allow_html=True)
     if st.session_state.user_id == 0:
         require_login("login")
     else:
-        # list users to chat with
-        conn = db.get_conn()
-        cur = conn.cursor()
-        cur.execute("SELECT id, nombre FROM users WHERE id != ?", (st.session_state.user_id,))
-        rows = cur.fetchall()
-        conn.close()
-        others = [dict(r) for r in rows]
-        if not others:
-            st.info("No hay otros usuarios registrados aún.")
+        # si arrived from a service, selected_user_id puede estar definido
+        if st.session_state.selected_user_id:
+            receptor_id = st.session_state.selected_user_id
         else:
+            # elegir usuario manualmente
+            conn = db.get_conn()
+            cur = conn.cursor()
+            cur.execute("SELECT id, nombre FROM users WHERE id != ?", (st.session_state.user_id,))
+            rows = cur.fetchall()
+            conn.close()
+            others = [dict(r) for r in rows]
+            if not others:
+                st.info("No hay otros usuarios registrados aún.")
+                return
             names = [o["nombre"] for o in others]
-            selected = st.selectbox("Selecciona un usuario", names, index=0)
+            selected = st.selectbox("Selecciona un usuario", names)
             receptor = next(o for o in others if o["nombre"] == selected)
             receptor_id = receptor["id"]
-            st.subheader(f"Chat con {selected}")
 
+        receptor = db.get_user_by_id(receptor_id)
+        if receptor:
+            st.subheader(f"Chat con {receptor['nombre']}")
             mensajes = db.get_messages_between(st.session_state.user_id, receptor_id)
             if mensajes:
                 for m in mensajes:
-                    autor = "Tú" if m["emisor_id"] == st.session_state.user_id else selected
+                    autor = "Tú" if m["emisor_id"] == st.session_state.user_id else receptor['nombre']
                     clase = "chat-right" if autor == "Tú" else "chat-left"
                     st.markdown(f'<div class="chat-bubble {clase}">{autor}: {m["contenido"]} <span class="chat-time">{m["timestamp"][:16]}</span></div>', unsafe_allow_html=True)
             else:
@@ -277,9 +286,13 @@ elif st.session_state.page == "chats":
                         db.add_message(st.session_state.user_id, receptor_id, nuevo.strip())
                         db.add_notification(receptor_id, "mensaje", f"Nuevo mensaje de {db.get_user_by_id(st.session_state.user_id)['nombre']}")
                         st.success("Mensaje enviado")
+                        # limpiar selected_user para que no se quede seleccionado accidentalmente
+                        st.session_state.selected_user_id = None
                         rerun_safe()
                     else:
                         st.warning("Escribe un mensaje antes de enviar.")
+        else:
+            st.error("Usuario receptor no encontrado.")
 
 # NOTIFICACIONES
 elif st.session_state.page == "notificaciones":
@@ -299,7 +312,7 @@ elif st.session_state.page == "notificaciones":
         else:
             st.info("No tienes notificaciones nuevas.")
 
-# PERFIL PROPIO (y skills)
+# PERFIL PROPIO (y publicar servicio con flow similar a inicio)
 elif st.session_state.page == "perfil":
     st.markdown('<h1 class="conecta-title">👤 Mi Perfil</h1>', unsafe_allow_html=True)
     if st.session_state.user_id == 0:
@@ -319,17 +332,66 @@ elif st.session_state.page == "perfil":
             if skills:
                 st.write(", ".join(skills))
             else:
-                st.write("No has agregado servicios todavía.")
+                st.write("No has agregado servicios tipo 'skill' todavía.")
 
-            with st.form("add_skill_form"):
-                nueva_skill = st.text_input("Agregar servicio que ofreces (ej: Pasear perros)")
-                if st.form_submit_button("Agregar servicio"):
-                    if nueva_skill.strip():
-                        db.add_skill(st.session_state.user_id, nueva_skill.strip())
-                        st.success("Servicio agregado")
-                        rerun_safe()
-                    else:
-                        st.warning("Ingresa un servicio válido.")
+            # lista de servicios publicados por el usuario (tabla services)
+            st.subheader("Tus publicaciones")
+            user_services = db.get_user_services(st.session_state.user_id)
+            if user_services:
+                for s in user_services:
+                    st.markdown(f"- {s['service']} ({s['category']}) — {s.get('comuna') or 'Sin comuna'} — Precio: {('$'+str(s['price'])) if s.get('price') else 'No informado'}")
+            else:
+                st.write("Aún no has publicado servicios.")
+
+            st.markdown("---")
+            st.write("### Publicar un servicio (flujo similar a la pantalla principal)")
+            st.write("1) Selecciona una categoría (igual que en Inicio)")
+            # paso 1: escoger categoría
+            cat = st.selectbox("Categoría", [""] + list(opciones_map.keys()), key="pub_cat_select")
+            if cat:
+                st.session_state.publish_cat = cat
+                # mostrar subcategorías como botones en columnas (igual que en subcategoria)
+                sublista = opciones_map.get(cat, [])
+                if sublista:
+                    cols_per_row = 3
+                    st.write("2) Selecciona el servicio específico")
+                    for i in range(0, len(sublista), cols_per_row):
+                        cols = st.columns(cols_per_row)
+                        for idx, opt in enumerate(sublista[i:i+cols_per_row]):
+                            with cols[idx]:
+                                if st.button(opt, key=f"pub_opt_{i+idx}"):
+                                    st.session_state.publish_service = opt
+                                    rerun_safe()
+
+                # una vez elegido el servicio, mostramos formulario final para comuna/price
+                if st.session_state.publish_service:
+                    st.write(f"Has seleccionado: **{st.session_state.publish_service}**")
+                    with st.form("publish_service_form"):
+                        comuna_sel = st.selectbox("Comuna donde ofreces (opcional)", [""] + comunas_santiago)
+                        price_input = st.text_input("Precio (opcional, números)", key="pub_price")
+                        if st.form_submit_button("Publicar servicio"):
+                            # validaciones mínimas
+                            service_name = st.session_state.publish_service
+                            category_name = st.session_state.publish_cat or cat
+                            comuna_val = comuna_sel if comuna_sel else None
+                            try:
+                                price_val = float(price_input) if price_input.strip() else None
+                            except ValueError:
+                                st.warning("Precio inválido. Usa solo números (ej: 5000 o 12.5).")
+                                price_val = None
+                            # guardar en DB
+                            sid = db.add_service(st.session_state.user_id, category_name, service_name, comuna_val, price_val)
+                            if sid:
+                                st.success("Servicio publicado correctamente ✅")
+                                # limpiar estados de publicación
+                                st.session_state.publish_cat = None
+                                st.session_state.publish_service = None
+                                rerun_safe()
+                            else:
+                                st.error("No se pudo publicar el servicio (error interno).")
+
+            else:
+                st.info("Selecciona primero una categoría para ver los servicios disponibles.")
 
             st.markdown("---")
             if st.button("Editar perfil"):
@@ -342,7 +404,7 @@ elif st.session_state.page == "perfil":
                         st.success("Perfil actualizado")
                         rerun_safe()
 
-# LOGIN / REGISTRO pages (accessibles via sidebar radio)
+# LOGIN / REGISTRO
 elif st.session_state.page == "login" or st.session_state.page == "registro":
     if st.session_state.page == "login":
         st.markdown('<h1 class="conecta-title">🔐 Iniciar sesión</h1>', unsafe_allow_html=True)
