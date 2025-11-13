@@ -21,6 +21,28 @@ def rerun_safe():
         except Exception:
             pass
 
+# Helper seguro para obtener user id / name
+def current_user_id():
+    # prioriza user_id si está presente y no nulo
+    uid = st.session_state.get("user_id")
+    if uid:
+        return uid
+    u = st.session_state.get("user")
+    if isinstance(u, dict) and u.get("id"):
+        return u.get("id")
+    return None
+
+def current_user_name():
+    u = st.session_state.get("user")
+    if isinstance(u, dict) and u.get("nombre"):
+        return u.get("nombre")
+    uid = current_user_id()
+    if uid:
+        row = db.get_user_by_id(uid)
+        if row:
+            return row.get("nombre") or row.get("email")
+    return None
+
 # -------------------------
 # session defaults
 # -------------------------
@@ -73,20 +95,36 @@ if st.button("🏠 Inicio", key="home_btn"):
 # -------------------------
 # Sidebar navigation (simple)
 # -------------------------
+pages_display = ["Inicio","Iniciar sesión","Registrarse","Perfil","Chats","Notificaciones"]
+mapping = {"Inicio":"inicio","Iniciar sesión":"login","Registrarse":"registro","Perfil":"perfil","Chats":"chats","Notificaciones":"notificaciones"}
+# invert mapping to compute current label for radio
+def page_to_label(page_key):
+    for label, key in mapping.items():
+        if key == page_key:
+            return label
+    return "Inicio"
+
 with st.sidebar:
     st.markdown("### Navegación")
-    if st.session_state.user:
-        st.markdown(f"**{st.session_state.user.get('nombre')}**")
+    if current_user_name():
+        st.markdown(f"**{current_user_name()}**")
     else:
         st.markdown("**Invitado**")
-    choice = st.radio("", ["Inicio","Iniciar sesión","Registrarse","Perfil","Chats","Notificaciones"], index=0)
-    mapping = {"Inicio":"inicio","Iniciar sesión":"login","Registrarse":"registro","Perfil":"perfil","Chats":"chats","Notificaciones":"notificaciones"}
-    target = mapping.get(choice, "inicio")
-    if target != st.session_state.page:
-        st.session_state.page = target
+    # determine current index
+    current_label = page_to_label(st.session_state.get("page", "inicio"))
+    try:
+        sel_index = pages_display.index(current_label)
+    except Exception:
+        sel_index = 0
+    selection = st.radio("Ir a:", pages_display, index=sel_index)
+    selected_page = mapping.get(selection, "inicio")
+    # only change if different
+    if selected_page != st.session_state.get("page"):
+        st.session_state.page = selected_page
         rerun_safe()
+
     st.markdown("---")
-    if st.session_state.user:
+    if current_user_id():
         if st.button("🔒 Cerrar sesión"):
             st.session_state.user = None
             st.session_state.user_id = 0
@@ -125,7 +163,7 @@ opciones_map = {
 # -------------------------
 
 # INICIO
-if st.session_state.page == "inicio":
+if st.session_state.get("page") == "inicio":
     st.markdown('<h1 class="conecta-title">🤝 Conecta</h1>', unsafe_allow_html=True)
     st.write("Encuentra personas que ofrecen los servicios que necesitas.")
     st.subheader("Selecciona una categoría:")
@@ -154,7 +192,7 @@ if st.session_state.page == "inicio":
     termino = st.text_input("¿Qué servicio necesitas?", key="search_term")
     comuna_filter = st.selectbox("Filtrar por comuna (opcional):", [""] + comunas_santiago, key="search_comuna")
     if st.button("Buscar"):
-        if termino.strip():
+        if termino and termino.strip():
             comuna_sel = comuna_filter if comuna_filter else None
             servicios = db.get_services_filtered(termino.strip(), comuna_sel)
             if servicios:
@@ -177,12 +215,12 @@ if st.session_state.page == "inicio":
             st.warning("Ingresa un término para buscar.")
 
 # SUBCATEGORIA
-elif st.session_state.page == "subcategoria":
-    st.markdown(f'<h1 class="conecta-title">Categoría: {st.session_state.categoria}</h1>', unsafe_allow_html=True)
+elif st.session_state.get("page") == "subcategoria":
+    st.markdown(f'<h1 class="conecta-title">Categoría: {st.session_state.get("categoria")}</h1>', unsafe_allow_html=True)
     if st.button("⬅️ Volver"):
         st.session_state.page = "inicio"
         rerun_safe()
-    lista = opciones_map.get(st.session_state.categoria, [])
+    lista = opciones_map.get(st.session_state.get("categoria"), [])
     if lista:
         cols_per_row = 3
         for i in range(0, len(lista), cols_per_row):
@@ -197,7 +235,7 @@ elif st.session_state.page == "subcategoria":
         st.info("No hay opciones para esta categoría.")
 
 # UBICACION
-elif st.session_state.page == "ubicacion":
+elif st.session_state.get("page") == "ubicacion":
     st.markdown('<h1 class="conecta-title">📍 Selecciona tu ubicación</h1>', unsafe_allow_html=True)
     if st.button("⬅️ Volver"):
         st.session_state.page = "subcategoria"
@@ -210,7 +248,7 @@ elif st.session_state.page == "ubicacion":
         rerun_safe()
 
 # RESULTADOS
-elif st.session_state.page == "resultados":
+elif st.session_state.get("page") == "resultados":
     servicio = st.session_state.get("servicio", "")
     ubic = st.session_state.get("ubicacion", "")
     st.markdown(f'<h1 class="conecta-title">Resultados: {servicio} — {ubic}</h1>', unsafe_allow_html=True)
@@ -237,7 +275,7 @@ elif st.session_state.page == "resultados":
         st.info("No hay servicios publicados que coincidan (aún).")
 
 # PERFIL PÚBLICO
-elif st.session_state.page == "perfil_publico":
+elif st.session_state.get("page") == "perfil_publico":
     r = st.session_state.get("perfil_usuario", {"nombre":"Usuario"})
     st.markdown(f'<h1 class="conecta-title">👤 Perfil de {r["nombre"]}</h1>', unsafe_allow_html=True)
     if st.button("⬅️ Volver"):
@@ -248,18 +286,18 @@ elif st.session_state.page == "perfil_publico":
     st.write("**Descripción:** Persona confiable, con experiencia en el servicio (simulación).")
 
 # CHATS
-elif st.session_state.page == "chats":
+elif st.session_state.get("page") == "chats":
     st.markdown('<h1 class="conecta-title">💬 Chats</h1>', unsafe_allow_html=True)
-    if not st.session_state.user:
+    if not current_user_id():
         st.warning("Debes iniciar sesión para usar el chat.")
     else:
         # seleccionar receptor o usar el seleccionado por búsqueda
-        receptor_id = st.session_state.selected_user_id
+        receptor_id = st.session_state.get("selected_user_id")
         if receptor_id is None:
             # mostrar lista simple de otros usuarios
             conn = db.get_conn()
             cur = conn.cursor()
-            cur.execute("SELECT id, nombre FROM users WHERE id != ?", (st.session_state.user['id'],))
+            cur.execute("SELECT id, nombre FROM users WHERE id != ?", (current_user_id(),))
             rows = cur.fetchall()
             conn.close()
             others = [dict(r) for r in rows]
@@ -273,10 +311,10 @@ elif st.session_state.page == "chats":
         receptor = db.get_user_by_id(receptor_id)
         if receptor:
             st.subheader(f"Chat con {receptor['nombre']}")
-            mensajes = db.get_messages_between(st.session_state.user['id'], receptor_id)
+            mensajes = db.get_messages_between(current_user_id(), receptor_id)
             if mensajes:
                 for m in mensajes:
-                    autor = "Tú" if m["emisor_id"] == st.session_state.user['id'] else receptor['nombre']
+                    autor = "Tú" if m["emisor_id"] == current_user_id() else receptor['nombre']
                     clase = "chat-right" if autor == "Tú" else "chat-left"
                     st.markdown(f'<div class="chat-bubble {clase}"><b>{autor}:</b> {m["contenido"]}<span class="chat-time">{m["timestamp"][:16]}</span></div>', unsafe_allow_html=True)
             else:
@@ -285,22 +323,21 @@ elif st.session_state.page == "chats":
                 nuevo = st.text_input("Escribe un mensaje", key="new_msg")
                 if st.form_submit_button("Enviar"):
                     if nuevo and nuevo.strip():
-                        db.add_message(st.session_state.user['id'], receptor_id, nuevo.strip())
-                        db.add_notification(receptor_id, "mensaje", f"Nuevo mensaje de {st.session_state.user['nombre']}")
+                        db.add_message(current_user_id(), receptor_id, nuevo.strip())
+                        db.add_notification(receptor_id, "mensaje", f"Nuevo mensaje de {current_user_name() or 'Usuario'}")
                         st.success("Mensaje enviado")
-                        # limpiar selected_user para no forzar next time
                         st.session_state.selected_user_id = None
                         rerun_safe()
                     else:
                         st.warning("Escribe un mensaje antes de enviar.")
 
 # NOTIFICACIONES
-elif st.session_state.page == "notificaciones":
+elif st.session_state.get("page") == "notificaciones":
     st.markdown('<h1 class="conecta-title">🔔 Notificaciones</h1>', unsafe_allow_html=True)
-    if not st.session_state.user:
+    if not current_user_id():
         st.warning("Debes iniciar sesión para ver notificaciones.")
     else:
-        notifs = db.get_notifications(st.session_state.user['id'])
+        notifs = db.get_notifications(current_user_id())
         if notifs:
             for n in notifs:
                 estado = "Leído" if n.get("leido") else "Nuevo"
@@ -313,12 +350,12 @@ elif st.session_state.page == "notificaciones":
             st.info("No tienes notificaciones.")
 
 # PERFIL (y publicar servicio)
-elif st.session_state.page == "perfil":
+elif st.session_state.get("page") == "perfil":
     st.markdown('<h1 class="conecta-title">👤 Mi Perfil</h1>', unsafe_allow_html=True)
-    if not st.session_state.user:
+    if not current_user_id():
         st.warning("Debes iniciar sesión para ver tu perfil.")
     else:
-        user = db.get_user_by_id(st.session_state.user['id'])
+        user = db.get_user_by_id(current_user_id())
         if not user:
             st.warning("Usuario no encontrado.")
         else:
@@ -328,7 +365,7 @@ elif st.session_state.page == "perfil":
             st.write(f"**Bio:** {user['bio'] or '-'}")
 
             st.subheader("Tus publicaciones")
-            user_services = db.get_user_services(st.session_state.user['id'])
+            user_services = db.get_user_services(current_user_id())
             if user_services:
                 for s in user_services:
                     st.write(f"- {s['service']} ({s['category']}) — {s.get('comuna') or 'Sin comuna'} — Precio: {('$'+str(s['price'])) if s.get('price') else 'No informado'}")
@@ -364,7 +401,7 @@ elif st.session_state.page == "perfil":
                             except ValueError:
                                 st.warning("Precio inválido; usa solo números.")
                                 price_val = None
-                            sid = db.add_service(st.session_state.user['id'], category_name, service_name, comuna_val, price_val)
+                            sid = db.add_service(current_user_id(), category_name, service_name, comuna_val, price_val)
                             if sid:
                                 st.success("Servicio publicado correctamente")
                                 st.session_state.publish_cat = None
@@ -377,43 +414,52 @@ elif st.session_state.page == "perfil":
                 with st.form("edit_profile_form"):
                     nuevo_nombre = st.text_input("Nombre", user["nombre"])
                     nueva_bio = st.text_area("Bio", user["bio"] or "")
-                    nueva_comuna = st.selectbox("Comuna", [""] + comunas_santiago, index=(comunas_santiago.index(user["comuna"]) + 1) if user.get("comuna") in comunas_santiago else 0)
+                    # select default index safely
+                    default_idx = 0
+                    if user.get("comuna") in comunas_santiago:
+                        try:
+                            default_idx = comunas_santiago.index(user.get("comuna")) + 1
+                        except Exception:
+                            default_idx = 0
+                    nueva_comuna = st.selectbox("Comuna", [""] + comunas_santiago, index=default_idx)
                     if st.form_submit_button("Guardar cambios"):
-                        db.update_user_profile(st.session_state.user['id'], nuevo_nombre, nueva_bio, nueva_comuna)
+                        db.update_user_profile(current_user_id(), nuevo_nombre, nueva_bio, nueva_comuna)
                         st.success("Perfil actualizado")
                         rerun_safe()
 
 # LOGIN / REGISTRO
-elif st.session_state.page in ["login","registro"]:
-    if st.session_state.page == "login":
+elif st.session_state.get("page") in ["login","registro"]:
+    if st.session_state.get("page") == "login":
         st.markdown('<h1 class="conecta-title">🔐 Iniciar sesión</h1>', unsafe_allow_html=True)
-        email = st.text_input("Correo electrónico", key="login_email")
-        password = st.text_input("Contraseña", type="password", key="login_pwd")
-        if st.button("Entrar"):
-            user = auth.login_user(email.strip(), password)
-            if user:
-                st.session_state.user = {"id": user["id"], "nombre": user["nombre"], "email": user["email"]}
-                st.session_state.user_id = user["id"]
-                st.success("Inicio de sesión correcto")
-                st.session_state.page = "inicio"
-                rerun_safe()
-            else:
-                st.error("Credenciales incorrectas")
+        with st.form("login_form"):
+            email = st.text_input("Correo electrónico", key="login_email")
+            password = st.text_input("Contraseña", type="password", key="login_pwd")
+            if st.form_submit_button("Entrar"):
+                user = auth.login_user(email.strip(), password)
+                if user:
+                    st.session_state.user = {"id": user["id"], "nombre": user["nombre"], "email": user["email"]}
+                    st.session_state.user_id = user["id"]
+                    st.success("Inicio de sesión correcto")
+                    st.session_state.page = "inicio"
+                    rerun_safe()
+                else:
+                    st.error("Credenciales incorrectas")
     else:
         st.markdown('<h1 class="conecta-title">📝 Registrarse</h1>', unsafe_allow_html=True)
-        nombre = st.text_input("Nombre completo", key="reg_nombre")
-        email_r = st.text_input("Correo electrónico", key="reg_email")
-        pwd_r = st.text_input("Contraseña", type="password", key="reg_pwd")
-        bio_r = st.text_area("Descripción / Bio (opcional)", key="reg_bio")
-        comuna_r = st.selectbox("Comuna (opcional)", [""] + comunas_santiago, key="reg_comuna")
-        if st.button("Registrarse"):
-            new_id = auth.register_user(nombre.strip(), email_r.strip(), pwd_r, bio_r, comuna_r)
-            if new_id:
-                st.success("Cuenta creada. Puedes iniciar sesión.")
-                st.session_state.page = "login"
-                rerun_safe()
-            else:
-                st.error("No se pudo crear la cuenta (correo ya existe o faltan datos).")
+        with st.form("register_form"):
+            nombre = st.text_input("Nombre completo", key="reg_nombre")
+            email_r = st.text_input("Correo electrónico", key="reg_email")
+            pwd_r = st.text_input("Contraseña", type="password", key="reg_pwd")
+            bio_r = st.text_area("Descripción / Bio (opcional)", key="reg_bio")
+            comuna_r = st.selectbox("Comuna (opcional)", [""] + comunas_santiago, key="reg_comuna")
+            if st.form_submit_button("Registrarse"):
+                new_id = auth.register_user(nombre.strip(), email_r.strip(), pwd_r, bio_r, comuna_r)
+                if new_id:
+                    st.success("Cuenta creada. Puedes iniciar sesión.")
+                    st.session_state.page = "login"
+                    rerun_safe()
+                else:
+                    st.error("No se pudo crear la cuenta (correo ya existe o faltan datos).")
 
 # fallback
 else:
