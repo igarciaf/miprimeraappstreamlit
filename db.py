@@ -14,6 +14,7 @@ def get_conn():
 def init_db():
     conn = get_conn()
     cur = conn.cursor()
+
     # users
     cur.execute("""
     CREATE TABLE IF NOT EXISTS users (
@@ -50,12 +51,25 @@ def init_db():
         FOREIGN KEY (usuario_id) REFERENCES users(id)
     )
     """)
-    # user_skills
+    # user_skills (retrocompatible; opcional)
     cur.execute("""
     CREATE TABLE IF NOT EXISTS user_skills (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
         skill TEXT NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+    """)
+    # services: publicacion real de servicios (vinculada a users)
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS services (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        category TEXT NOT NULL,
+        service TEXT NOT NULL,
+        comuna TEXT,
+        price REAL,
+        created_at TEXT,
         FOREIGN KEY (user_id) REFERENCES users(id)
     )
     """)
@@ -74,7 +88,8 @@ def create_user(nombre: str, email: str, password_hash: str, bio: Optional[str]=
         )
         conn.commit()
         user_id = cur.lastrowid
-    except sqlite3.IntegrityError:
+    except sqlite3.IntegrityError as e:
+        # posible email duplicado
         user_id = 0
     conn.close()
     return user_id
@@ -157,7 +172,7 @@ def mark_notification_read(notification_id: int):
     conn.commit()
     conn.close()
 
-# --- Skills ---
+# --- Skills (retrocompatibilidad) ---
 def add_skill(user_id: int, skill: str):
     conn = get_conn()
     cur = conn.cursor()
@@ -183,6 +198,58 @@ def search_users_by_skill(skill: str) -> List[Dict]:
         WHERE LOWER(s.skill) LIKE LOWER(?)
         GROUP BY u.id
     """, (f"%{skill}%",))
+    rows = cur.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+# --- Services (publicaciones) ---
+def add_service(user_id: int, category: str, service: str, comuna: Optional[str]=None, price: Optional[float]=None) -> int:
+    conn = get_conn()
+    cur = conn.cursor()
+    created_at = datetime.utcnow().isoformat()
+    cur.execute(
+        "INSERT INTO services (user_id, category, service, comuna, price, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+        (user_id, category, service, comuna, price, created_at)
+    )
+    conn.commit()
+    service_id = cur.lastrowid
+    conn.close()
+    return service_id
+
+def get_user_services(user_id: int) -> List[Dict]:
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM services WHERE user_id = ? ORDER BY id DESC", (user_id,))
+    rows = cur.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+def get_services_filtered(term: str, comuna: Optional[str]=None) -> List[Dict]:
+    """
+    Busca servicios por término en service o category.
+    Si comuna es provista, la filtra por comuna.
+    Devuelve rows con info del servicio y datos del usuario (join).
+    """
+    conn = get_conn()
+    cur = conn.cursor()
+    term_like = f"%{term}%"
+    if comuna:
+        cur.execute("""
+            SELECT s.*, u.nombre as user_nombre, u.comuna as user_comuna, u.bio as user_bio
+            FROM services s
+            JOIN users u ON s.user_id = u.id
+            WHERE (LOWER(s.service) LIKE LOWER(?) OR LOWER(s.category) LIKE LOWER(?))
+              AND (s.comuna = ?)
+            ORDER BY s.id DESC
+        """, (term_like, term_like, comuna))
+    else:
+        cur.execute("""
+            SELECT s.*, u.nombre as user_nombre, u.comuna as user_comuna, u.bio as user_bio
+            FROM services s
+            JOIN users u ON s.user_id = u.id
+            WHERE (LOWER(s.service) LIKE LOWER(?) OR LOWER(s.category) LIKE LOWER(?))
+            ORDER BY s.id DESC
+        """, (term_like, term_like))
     rows = cur.fetchall()
     conn.close()
     return [dict(r) for r in rows]
