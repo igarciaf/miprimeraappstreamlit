@@ -95,8 +95,24 @@ if st.button("🏠 Inicio", key="home_btn"):
 # -------------------------
 # Sidebar navigation (simple)
 # -------------------------
-pages_display = ["Inicio","Iniciar sesión","Registrarse","Perfil","Chats","Notificaciones"]
-mapping = {"Inicio":"inicio","Iniciar sesión":"login","Registrarse":"registro","Perfil":"perfil","Chats":"chats","Notificaciones":"notificaciones"}
+pages_display = [
+    "Inicio", "Subcategoría", "Ubicación", "Resultados", "Perfil público",
+    "Iniciar sesión", "Registrarse", "Perfil", "Chats", "Notificaciones"
+]
+
+mapping = {
+    "Inicio": "inicio",
+    "Subcategoría": "subcategoria",
+    "Ubicación": "ubicacion",
+    "Resultados": "resultados",
+    "Perfil público": "perfil_publico",
+    "Iniciar sesión": "login",
+    "Registrarse": "registro",
+    "Perfil": "perfil",
+    "Chats": "chats",
+    "Notificaciones": "notificaciones",
+}
+
 # invert mapping to compute current label for radio
 def page_to_label(page_key):
     for label, key in mapping.items():
@@ -169,23 +185,28 @@ if st.session_state.get("page") == "inicio":
     c1, c2 = st.columns(2)
 
     # ---- BOTONES ARREGLADOS (SIN rerun_safe) ----
-    with c1:
-        if st.button("Cuidado de mascotas", key="btn_mascotas"):
-            st.session_state.categoria = "Mascotas"
-            st.session_state.page = "subcategoria"
+with c1:
+    if st.button("Cuidado de mascotas", key="btn_mascotas"):
+        st.session_state.categoria = "Mascotas"
+        st.session_state.page = "subcategoria"
+        rerun_safe()
 
-        if st.button("Limpieza y hogar", key="btn_hogar"):
-            st.session_state.categoria = "Hogar"
-            st.session_state.page = "subcategoria"
+    if st.button("Limpieza y hogar", key="btn_hogar"):
+        st.session_state.categoria = "Hogar"
+        st.session_state.page = "subcategoria"
+        rerun_safe()
 
-    with c2:
-        if st.button("Clases particulares", key="btn_clases"):
-            st.session_state.categoria = "Clases"
-            st.session_state.page = "subcategoria"
+with c2:
+    if st.button("Clases particulares", key="btn_clases"):
+        st.session_state.categoria = "Clases"
+        st.session_state.page = "subcategoria"
+        rerun_safe()
 
-        if st.button("Cuidado de niños", key="btn_ninos"):
-            st.session_state.categoria = "Niños"
-            st.session_state.page = "subcategoria"
+    if st.button("Cuidado de niños", key="btn_ninos"):
+        st.session_state.categoria = "Niños"
+        st.session_state.page = "subcategoria"
+        rerun_safe()
+
 
     st.markdown("---")
     st.subheader("Buscar por servicio")
