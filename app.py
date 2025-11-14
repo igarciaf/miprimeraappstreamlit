@@ -13,14 +13,8 @@ st.set_page_config(page_title="Conecta", page_icon="🤝", layout="wide")
 # Helpers / rerun
 # -------------------------
 def rerun_safe():
-    """Reejecución segura (compatibilidad con distintas versiones)."""
-    try:
-        st.experimental_rerun()
-    except Exception:
-        try:
-            st.rerun()
-        except Exception:
-            pass
+    """Reejecución segura."""
+    st.rerun()
 
 
 def current_user_id():
