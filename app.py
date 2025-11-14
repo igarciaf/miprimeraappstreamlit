@@ -196,43 +196,40 @@ if st.session_state.get("page") == "inicio":
 
     c1, c2 = st.columns(2)
 
-    # ---- BOTONES ARREGLADOS (INDENTACIÓN CORRECTA) ----
     with c1:
-        if st.button("Cuidado de mascotas", key="btn_mascotas"):
+        if st.button("Cuidado de mascotas", key="btn_mascotas", use_container_width=True):
             st.session_state.categoria = "Mascotas"
             st.session_state.page = "subcategoria"
-            rerun_safe()
+            st.rerun()
 
-        if st.button("Limpieza y hogar", key="btn_hogar"):
+        if st.button("Limpieza y hogar", key="btn_hogar", use_container_width=True):
             st.session_state.categoria = "Hogar"
             st.session_state.page = "subcategoria"
-            rerun_safe()
+            st.rerun()
 
     with c2:
-        if st.button("Clases particulares", key="btn_clases"):
+        if st.button("Clases particulares", key="btn_clases", use_container_width=True):
             st.session_state.categoria = "Clases"
             st.session_state.page = "subcategoria"
-            rerun_safe()
+            st.rerun()
 
-        if st.button("Cuidado de niños", key="btn_ninos"):
+        if st.button("Cuidado de niños", key="btn_ninos", use_container_width=True):
             st.session_state.categoria = "Niños"
             st.session_state.page = "subcategoria"
-            rerun_safe()
+            st.rerun()
 
     st.markdown("---")
     st.subheader("Buscar por servicio")
-    termino = st.text_input("¿Qué servicio necesitas?", key="search_term")
-    comuna_filter = st.selectbox("Filtrar por comuna (opcional):", [""] + comunas_santiago, key="search_comuna")
+    termino = st.text_input("¿Qué servicio necesitas?", key="search_term_input")
+    comuna_filter = st.selectbox("Filtrar por comuna (opcional):", [""] + comunas_santiago, key="search_comuna_select")
     
-    # botón búsqueda
-    if st.button("Buscar", key="buscar_inicio_btn"):
-        st.session_state.search_term = termino or ""
-        st.session_state.search_comuna = comuna_filter or ""
-        # si hay término vamos a RESULTADOS (busqueda directa)
+    if st.button("Buscar", key="buscar_inicio_btn", use_container_width=False):
         if termino and termino.strip():
+            st.session_state.search_term = termino.strip()
+            st.session_state.search_comuna = comuna_filter or ""
             st.session_state.servicio = termino.strip()
             st.session_state.page = "resultados"
-            rerun_safe()
+            st.rerun()
         else:
             st.warning("Ingresa un término para buscar.")
 
