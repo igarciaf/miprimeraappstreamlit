@@ -226,27 +226,45 @@ def get_recent_chats(user_id: int) -> List[Dict]:
         return []
     conn = get_conn()
     cur = conn.cursor()
+    
+    # Obtener todos los mensajes donde el usuario participa
     cur.execute("""
-        SELECT DISTINCT
-            CASE 
-                WHEN m.emisor_id = ? THEN m.receptor_id
-                ELSE m.emisor_id
-            END as other_user_id,
-            u.nombre as other_user_name,
-            m.contenido as last_message,
-            m.timestamp as last_timestamp,
-            (SELECT COUNT(*) FROM messages m2 
-             WHERE m2.receptor_id = ? 
-             AND m2.emisor_id = other_user_id) as unread_count
+        SELECT 
+            m.id,
+            m.emisor_id,
+            m.receptor_id,
+            m.contenido,
+            m.timestamp
         FROM messages m
-        JOIN users u ON u.id = CASE 
-            WHEN m.emisor_id = ? THEN m.receptor_id 
-            ELSE m.emisor_id 
-        END
         WHERE m.emisor_id = ? OR m.receptor_id = ?
-        GROUP BY other_user_id
-        ORDER BY m.id DESC
-    """, (user_id, user_id, user_id, user_id, user_id))
-    rows = cur.fetchall()
+        ORDER BY m.timestamp DESC
+    """, (user_id, user_id))
+    
+    messages = cur.fetchall()
+    
+    # Procesar mensajes para obtener conversaciones únicas
+    chats_dict = {}
+    for msg in messages:
+        msg = dict(msg)
+        # Determinar quién es el otro usuario
+        other_user_id = msg['receptor_id'] if msg['emisor_id'] == user_id else msg['emisor_id']
+        
+        # Solo guardar el primer mensaje (más reciente) de cada conversación
+        if other_user_id not in chats_dict:
+            chats_dict[other_user_id] = {
+                'other_user_id': other_user_id,
+                'last_message': msg['contenido'],
+                'last_timestamp': msg['timestamp']
+            }
+    
+    # Obtener nombres de los usuarios
+    result = []
+    for other_id, chat_data in chats_dict.items():
+        cur.execute("SELECT nombre FROM users WHERE id = ?", (other_id,))
+        user_row = cur.fetchone()
+        if user_row:
+            chat_data['other_user_name'] = user_row['nombre']
+            result.append(chat_data)
+    
     conn.close()
-    return [dict(r) for r in rows]
+    return result
