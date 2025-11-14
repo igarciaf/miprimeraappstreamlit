@@ -219,3 +219,34 @@ def mark_notification_read(notification_id: int):
     cur.execute("UPDATE notifications SET leido = 1 WHERE id = ?", (notification_id,))
     conn.commit()
     conn.close()
+
+def get_recent_chats(user_id: int) -> List[Dict]:
+    """Obtiene lista de chats recientes con el último mensaje"""
+    if not user_id:
+        return []
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT DISTINCT
+            CASE 
+                WHEN m.emisor_id = ? THEN m.receptor_id
+                ELSE m.emisor_id
+            END as other_user_id,
+            u.nombre as other_user_name,
+            m.contenido as last_message,
+            m.timestamp as last_timestamp,
+            (SELECT COUNT(*) FROM messages m2 
+             WHERE m2.receptor_id = ? 
+             AND m2.emisor_id = other_user_id) as unread_count
+        FROM messages m
+        JOIN users u ON u.id = CASE 
+            WHEN m.emisor_id = ? THEN m.receptor_id 
+            ELSE m.emisor_id 
+        END
+        WHERE m.emisor_id = ? OR m.receptor_id = ?
+        GROUP BY other_user_id
+        ORDER BY m.id DESC
+    """, (user_id, user_id, user_id, user_id, user_id))
+    rows = cur.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
