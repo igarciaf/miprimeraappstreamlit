@@ -391,58 +391,130 @@ elif st.session_state.get("page") == "perfil_publico":
             st.session_state.page = "chats"
             rerun_safe()
 
-
 # ---------- CHATS ----------
 elif st.session_state.get("page") == "chats":
     st.markdown('<h1 class="conecta-title">💬 Chats</h1>', unsafe_allow_html=True)
     if not current_user_id():
         st.warning("Debes iniciar sesión para usar el chat.")
     else:
+        # Obtener chats recientes
+        recent_chats = db.get_recent_chats(current_user_id())
+        
         receptor_id = st.session_state.get("selected_user_id")
-        # si no hay receptor preseleccionado, mostramos lista simple
-        if receptor_id is None:
-            conn = db.get_conn()
-            cur = conn.cursor()
-            cur.execute("SELECT id, nombre FROM users WHERE id != ?", (current_user_id(),))
-            rows = cur.fetchall()
-            conn.close()
-            others = [dict(r) for r in rows]
-            if not others:
-                st.info("No hay otros usuarios registrados aún.")
-            else:
-                names = [o["nombre"] for o in others]
-                sel = st.selectbox("Selecciona un usuario", names, key="chat_select_user")
-                receptor = next(o for o in others if o["nombre"] == sel)
-                receptor_id = receptor["id"]
-
-        receptor = db.get_user_by_id(receptor_id)
-        if receptor:
-            st.subheader(f"Chat con {receptor['nombre']}")
-            mensajes = db.get_messages_between(current_user_id(), receptor_id)
-            if mensajes:
-                for m in mensajes:
-                    autor = "Tú" if m["emisor_id"] == current_user_id() else receptor["nombre"]
-                    clase = "chat-right" if autor == "Tú" else "chat-left"
-                    st.markdown(
-                        f'<div class="chat-bubble {clase}"><b>{autor}:</b> {m["contenido"]}'
-                        f'<span class="chat-time">{m["timestamp"][:16]}</span></div>',
-                        unsafe_allow_html=True,
-                    )
-            else:
-                st.info("No hay mensajes aún. Escribe el primero.")
-
-            with st.form("send_msg_form", clear_on_submit=True):
-                nuevo = st.text_input("Escribe un mensaje", key="new_msg_input")
-                if st.form_submit_button("Enviar"):
-                    if nuevo and nuevo.strip():
-                        db.add_message(current_user_id(), receptor_id, nuevo.strip())
-                        db.add_notification(receptor_id, "mensaje", f"Nuevo mensaje de {current_user_name() or 'Usuario'}")
-                        st.success("Mensaje enviado")
-                        st.session_state.selected_user_id = None
-                        rerun_safe()
+        
+        # Layout de dos columnas: lista de chats | conversación activa
+        col_list, col_chat = st.columns([1, 2])
+        
+        with col_list:
+            st.subheader("Conversaciones")
+            
+            # Mostrar chats recientes
+            if recent_chats:
+                for chat in recent_chats:
+                    # Crear un botón para cada chat
+                    preview = chat['last_message'][:30] + "..." if len(chat['last_message']) > 30 else chat['last_message']
+                    time_preview = chat['last_timestamp'][11:16] if chat['last_timestamp'] else ""
+                    
+                    # Highlight si es el chat seleccionado
+                    is_selected = (receptor_id == chat['other_user_id'])
+                    button_style = "🟢" if is_selected else "💬"
+                    
+                    if st.button(
+                        f"{button_style} {chat['other_user_name']}\n{preview} · {time_preview}",
+                        key=f"chat_item_{chat['other_user_id']}",
+                        use_container_width=True
+                    ):
+                        st.session_state.selected_user_id = chat['other_user_id']
+                        st.rerun()
+                
+                st.markdown("---")
+            
+            # Opción para iniciar nuevo chat
+            if st.button("➕ Nuevo chat", key="new_chat_btn", use_container_width=True):
+                conn = db.get_conn()
+                cur = conn.cursor()
+                cur.execute("SELECT id, nombre FROM users WHERE id != ?", (current_user_id(),))
+                rows = cur.fetchall()
+                conn.close()
+                others = [dict(r) for r in rows]
+                
+                if others:
+                    # Filtrar usuarios que ya tienen chat
+                    chat_user_ids = [c['other_user_id'] for c in recent_chats]
+                    new_users = [u for u in others if u['id'] not in chat_user_ids]
+                    
+                    if new_users:
+                        st.session_state.show_new_chat_selector = True
+                        st.rerun()
                     else:
-                        st.warning("Escribe un mensaje antes de enviar.")
-
+                        st.info("Ya tienes chats con todos los usuarios.")
+                else:
+                    st.info("No hay otros usuarios registrados.")
+            
+            # Selector de nuevo chat
+            if st.session_state.get("show_new_chat_selector"):
+                conn = db.get_conn()
+                cur = conn.cursor()
+                cur.execute("SELECT id, nombre FROM users WHERE id != ?", (current_user_id(),))
+                rows = cur.fetchall()
+                conn.close()
+                others = [dict(r) for r in rows]
+                
+                chat_user_ids = [c['other_user_id'] for c in recent_chats] if recent_chats else []
+                new_users = [u for u in others if u['id'] not in chat_user_ids]
+                
+                if new_users:
+                    names = [u["nombre"] for u in new_users]
+                    sel = st.selectbox("Selecciona usuario:", names, key="new_chat_select")
+                    if st.button("Iniciar chat", key="start_new_chat"):
+                        selected_user = next(u for u in new_users if u["nombre"] == sel)
+                        st.session_state.selected_user_id = selected_user["id"]
+                        st.session_state.show_new_chat_selector = False
+                        st.rerun()
+                    if st.button("Cancelar", key="cancel_new_chat"):
+                        st.session_state.show_new_chat_selector = False
+                        st.rerun()
+        
+        with col_chat:
+            if receptor_id:
+                receptor = db.get_user_by_id(receptor_id)
+                if receptor:
+                    st.subheader(f"Chat con {receptor['nombre']}")
+                    
+                    # Contenedor de mensajes
+                    mensajes = db.get_messages_between(current_user_id(), receptor_id)
+                    
+                    # Mostrar mensajes en un contenedor con scroll
+                    if mensajes:
+                        for m in mensajes:
+                            autor = "Tú" if m["emisor_id"] == current_user_id() else receptor["nombre"]
+                            clase = "chat-right" if autor == "Tú" else "chat-left"
+                            st.markdown(
+                                f'<div class="chat-bubble {clase}"><b>{autor}:</b> {m["contenido"]}'
+                                f'<span class="chat-time">{m["timestamp"][11:16]}</span></div>',
+                                unsafe_allow_html=True,
+                            )
+                        # Forzar scroll al final
+                        st.markdown('<div style="clear:both;"></div>', unsafe_allow_html=True)
+                    else:
+                        st.info("No hay mensajes aún. Escribe el primero.")
+                    
+                    # Formulario para enviar mensaje
+                    with st.form("send_msg_form", clear_on_submit=True):
+                        nuevo = st.text_input("Escribe un mensaje", key="new_msg_input", placeholder="Escribe aquí...")
+                        col1, col2 = st.columns([5, 1])
+                        with col2:
+                            send_btn = st.form_submit_button("Enviar", use_container_width=True)
+                        
+                        if send_btn:
+                            if nuevo and nuevo.strip():
+                                db.add_message(current_user_id(), receptor_id, nuevo.strip())
+                                db.add_notification(receptor_id, "mensaje", f"Nuevo mensaje de {current_user_name() or 'Usuario'}")
+                                st.rerun()
+                            else:
+                                st.warning("Escribe un mensaje antes de enviar.")
+            else:
+                st.info("👈 Selecciona una conversación o inicia un nuevo chat")
 
 # ---------- NOTIFICACIONES ----------
 elif st.session_state.get("page") == "notificaciones":
