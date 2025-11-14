@@ -226,22 +226,6 @@ if st.session_state.get("page") == "inicio":
             st.session_state.page = "subcategoria"
             st.rerun()
 
-    st.markdown("---")
-    st.subheader("Buscar por servicio")
-    termino = st.text_input("¿Qué servicio necesitas?", key="search_term_input")
-    comuna_filter = st.selectbox("Filtrar por comuna (opcional):", [""] + comunas_santiago, key="search_comuna_select")
-    
-    if st.button("Buscar", key="buscar_inicio_btn", use_container_width=False):
-        if termino and termino.strip():
-            st.session_state.search_term = termino.strip()
-            st.session_state.search_comuna = comuna_filter or ""
-            st.session_state.servicio = termino.strip()
-            st.session_state.page = "resultados"
-            st.rerun()
-        else:
-            st.warning("Ingresa un término para buscar.")
-
-
 # ---------- SUBCATEGORIA ----------
 elif st.session_state.get("page") == "subcategoria":
     st.markdown(f'<h1 class="conecta-title">Categoría: {st.session_state.get("categoria") or "-"}</h1>', unsafe_allow_html=True)
