@@ -192,39 +192,44 @@ opciones_map = {
 # -------------------------
 # PAGES: flujo solicitado
 # -------------------------
-
-# ---------- INICIO ----------
+# ---------------------------
+# PÁGINA DE INICIO (ARREGLADO)
+# ---------------------------
 if st.session_state.get("page") == "inicio":
     st.markdown('<h1 class="conecta-title">🤝 Conecta</h1>', unsafe_allow_html=True)
     st.write("Encuentra personas que ofrecen los servicios que necesitas.")
     st.subheader("Selecciona una categoría:")
 
-    # Dos columnas con pocas opciones (primer filtro)
     c1, c2 = st.columns(2)
+
+    # ---- BOTONES ARREGLADOS (INDENTACIÓN CORRECTA) ----
     with c1:
-        if st.button("Cuidado de mascotas", key="inicio_mascotas"):
+        if st.button("Cuidado de mascotas", key="btn_mascotas"):
             st.session_state.categoria = "Mascotas"
             st.session_state.page = "subcategoria"
             rerun_safe()
-        if st.button("Limpieza y hogar", key="inicio_hogar"):
+
+        if st.button("Limpieza y hogar", key="btn_hogar"):
             st.session_state.categoria = "Hogar"
             st.session_state.page = "subcategoria"
             rerun_safe()
+
     with c2:
-        if st.button("Clases particulares", key="inicio_clases"):
+        if st.button("Clases particulares", key="btn_clases"):
             st.session_state.categoria = "Clases"
             st.session_state.page = "subcategoria"
             rerun_safe()
-        if st.button("Cuidado de niños", key="inicio_ninos"):
+
+        if st.button("Cuidado de niños", key="btn_ninos"):
             st.session_state.categoria = "Niños"
             st.session_state.page = "subcategoria"
             rerun_safe()
 
     st.markdown("---")
-    st.subheader("Buscar por servicio (directo)")
-    # guardamos en session_state para que sea consistente
-    termino = st.text_input("¿Qué servicio necesitas?", value=st.session_state.get("search_term", ""), key="search_term_input")
-    comuna_filter = st.selectbox("Filtrar por comuna (opcional):", [""] + comunas_santiago, index=0, key="search_comuna_input")
+    st.subheader("Buscar por servicio")
+    termino = st.text_input("¿Qué servicio necesitas?", key="search_term")
+    comuna_filter = st.selectbox("Filtrar por comuna (opcional):", [""] + comunas_santiago, key="search_comuna")
+    
     # botón búsqueda
     if st.button("Buscar", key="buscar_inicio_btn"):
         st.session_state.search_term = termino or ""
