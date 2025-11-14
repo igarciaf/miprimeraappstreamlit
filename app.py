@@ -114,13 +114,13 @@ mapping = {
     "Notificaciones": "notificaciones",
 }
 
-
 def page_to_label(page_key):
+    # Solo mapeamos las páginas que están en el radio
     for label, key in mapping.items():
         if key == page_key:
             return label
-    return "Inicio"
-
+    # Si la página actual no está en el radio, devolvemos None
+    return None
 
 with st.sidebar:
     st.markdown("### Navegación")
@@ -130,21 +130,29 @@ with st.sidebar:
         st.markdown("**Invitado**")
 
     current_label = page_to_label(st.session_state.get("page", "inicio"))
-    try:
-        sel_index = pages_display.index(current_label)
-    except Exception:
-        sel_index = 0
-
-    selection = st.radio("Ir a:", pages_display, index=sel_index)
-    selected_page = mapping.get(selection, "inicio")
-
-    if selected_page != st.session_state.get("page"):
-        st.session_state.page = selected_page
-        rerun_safe()
+    
+    # Solo mostramos el radio si estamos en una página "principal"
+    if current_label:
+        try:
+            sel_index = pages_display.index(current_label)
+        except Exception:
+            sel_index = 0
+        
+        selection = st.radio("Ir a:", pages_display, index=sel_index, key="sidebar_nav_radio")
+        selected_page = mapping.get(selection, "inicio")
+        
+        # Solo cambiamos si el usuario REALMENTE seleccionó algo diferente en el radio
+        if selected_page != st.session_state.get("page"):
+            st.session_state.page = selected_page
+            rerun_safe()
+    else:
+        # Si estamos en subcategoria, ubicacion, resultados, etc.
+        st.info(f"📍 {st.session_state.get('page', 'navegando').replace('_', ' ').title()}")
+        st.write("Usa los botones de navegación en la página principal.")
 
     st.markdown("---")
     if current_user_id():
-        if st.button("🔒 Cerrar sesión"):
+        if st.button("🔒 Cerrar sesión", key="logout_btn"):
             st.session_state.user = None
             st.session_state.user_id = 0
             st.session_state.selected_user_id = None
