@@ -59,7 +59,12 @@ defaults = {
     "search_comuna": "",
     "results_filter_price_min": "",
     "results_filter_price_max": "",
-    "results_filter_rating_min": ""
+    "results_filter_rating_min": "",
+    # NUEVOS para sistema de trabajos
+    "solicitar_servicio_id": None,
+    "solicitar_trabajador_id": None,
+    "ver_trabajo_id": None,
+    "show_new_chat_selector": False,
 }
 for k, v in defaults.items():
     st.session_state.setdefault(k, v)
@@ -100,16 +105,16 @@ if st.button("🏠 Inicio", key="home_btn"):
     st.session_state.page = "inicio"
     rerun_safe()
 
-
 # -------------------------
 # Sidebar navigation (simple)
 # -------------------------
-pages_display = ["Inicio", "Iniciar sesión", "Registrarse", "Perfil", "Chats", "Notificaciones"]
+pages_display = ["Inicio", "Iniciar sesión", "Registrarse", "Perfil", "Mis Trabajos", "Chats", "Notificaciones"]
 mapping = {
     "Inicio": "inicio",
     "Iniciar sesión": "login",
     "Registrarse": "registro",
     "Perfil": "perfil",
+    "Mis Trabajos": "mis_trabajos",
     "Chats": "chats",
     "Notificaciones": "notificaciones",
 }
@@ -273,53 +278,47 @@ elif st.session_state.get("page") == "ubicacion":
             st.session_state.page = "resultados"
             rerun_safe()
 
-# ---------- RESULTADOS ----------
-elif st.session_state.get("page") == "resultados":
-    servicio = st.session_state.get("servicio", "") or st.session_state.get("search_term", "")
-    ubic = st.session_state.get("ubicacion", "") or (st.session_state.get("search_comuna") and f"{st.session_state.get('search_comuna')}, Santiago") or ""
-    st.markdown(f'<h1 class="conecta-title">Resultados: {servicio} — {ubic or "Todas las comunas"}</h1>', unsafe_allow_html=True)
-    if st.button("⬅️ Volver", key="volver_resultados"):
-        # si venimos de búsqueda directa volvemos a inicio, si venimos del flujo volvemos a ubicación
-        if st.session_state.get("servicio") and st.session_state.get("ubicacion"):
-            st.session_state.page = "ubicacion"
-        else:
-            st.session_state.page = "inicio"
-        rerun_safe()
+for s in servicios:
+    st.markdown(
+        f'<div class="service-card"><b>{s["service"]}</b> — {s["category"]} <br>'
+        f'Proveedor: <b>{s["user_nombre"]}</b> — {s.get("user_comuna") or "Sin comuna"}<br>'
+        f'Precio: {("$"+str(s["price"])) if s.get("price") else "No informado"}<br>'
+        f'<i>{s.get("user_bio") or ""}</i></div>',
+        unsafe_allow_html=True
+    )
 
-    # Filtros en una sola fila
-    st.subheader("Filtros y Ordenamiento")
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        pmin = st.text_input("💰 Precio mín", value=st.session_state.get("results_filter_price_min", ""), key="f_pmin", placeholder="Ej: 5000")
-    
-    with col2:
-        pmax = st.text_input("💰 Precio máx", value=st.session_state.get("results_filter_price_max", ""), key="f_pmax", placeholder="Ej: 50000")
-    
-    with col3:
-        # Opciones de ordenamiento
-        orden_opciones = [
-            "Más recientes primero",
-            "Precio: menor a mayor",
-            "Precio: mayor a menor",
-            "Alfabético (A-Z)",
-            "Alfabético (Z-A)"
-        ]
-        orden_seleccionado = st.selectbox(
-            "🔽 Ordenar por",
-            orden_opciones,
-            index=0,
-            key="orden_select"
-        )
-    
-    with col4:
-        st.write("")  # Espaciado
-        st.write("")  # Espaciado
-        if st.button("Aplicar", key="apply_result_filters", use_container_width=True):
-            st.session_state.results_filter_price_min = pmin
-            st.session_state.results_filter_price_max = pmax
-            st.session_state.results_order = orden_seleccionado
+    # ---------------- NUEVOS BOTONES ----------------
+    cols = st.columns([1, 1, 1])
+
+    # 1) VER PERFIL
+    with cols[0]:
+        if st.button("👤 Ver perfil", key=f"verperfil_{s['id']}"):
+            st.session_state.perfil_usuario = {
+                "id": s.get("user_id"),
+                "nombre": s.get("user_nombre"),
+                "servicio": s.get("service"),
+                "valoracion": s.get("rating", "N/A"),
+                "bio": s.get("user_bio")
+            }
+            st.session_state.page = "perfil_publico"
             rerun_safe()
+
+    # 2) CHATEAR
+    with cols[1]:
+        if st.button(f"💬 Chatear", key=f"chat_result_{s['id']}"):
+            st.session_state.selected_user_id = s["user_id"]
+            st.session_state.page = "chats"
+            rerun_safe()
+
+    # 3) SOLICITAR (solo si no es su propio servicio)
+    with cols[2]:
+        if current_user_id() and current_user_id() != s["user_id"]:
+            if st.button(f"✅ Solicitar", key=f"solicitar_result_{s['id']}"):
+                st.session_state.solicitar_servicio_id = s["id"]
+                st.session_state.solicitar_trabajador_id = s["user_id"]
+                st.session_state.page = "solicitar_servicio"
+                rerun_safe()
+
 
     st.markdown("---")
 
@@ -646,8 +645,280 @@ elif st.session_state.get("page") == "perfil":
                         db.update_user_profile(current_user_id(), nuevo_nombre, nueva_bio, nueva_comuna)
                         st.success("Perfil actualizado")
                         rerun_safe()
-
-
+# ---------- SOLICITAR SERVICIO ----------
+elif st.session_state.get("page") == "solicitar_servicio":
+    st.markdown('<h1 class="conecta-title">✅ Solicitar Servicio</h1>', unsafe_allow_html=True)
+    
+    if not current_user_id():
+        st.warning("Debes iniciar sesión para solicitar un servicio.")
+        if st.button("Ir a iniciar sesión"):
+            st.session_state.page = "login"
+            rerun_safe()
+    else:
+        servicio_id = st.session_state.get("solicitar_servicio_id")
+        trabajador_id = st.session_state.get("solicitar_trabajador_id")
+        
+        if not servicio_id or not trabajador_id:
+            st.error("Error: No se encontró el servicio.")
+            if st.button("⬅️ Volver"):
+                st.session_state.page = "resultados"
+                rerun_safe()
+        else:
+            # Obtener info del servicio
+            conn = db.get_conn()
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT s.*, u.nombre as trabajador_nombre
+                FROM services s
+                JOIN users u ON s.user_id = u.id
+                WHERE s.id = ?
+            """, (servicio_id,))
+            servicio = cur.fetchone()
+            conn.close()
+            
+            if servicio:
+                servicio = dict(servicio)
+                st.info(f"📋 **Servicio:** {servicio['service']} ({servicio['category']})")
+                st.info(f"👷 **Trabajador:** {servicio['trabajador_nombre']}")
+                
+                if servicio.get('price'):
+                    st.info(f"💰 **Precio:** ${int(servicio['price'])}")
+                
+                st.markdown("---")
+                st.subheader("Completa los detalles de tu solicitud:")
+                
+                with st.form("solicitud_form"):
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        fecha = st.date_input("📅 Fecha deseada", min_value=datetime.now().date())
+                    
+                    with col2:
+                        hora = st.time_input("🕐 Hora aproximada")
+                    
+                    direccion = st.text_input("📍 Dirección completa", placeholder="Calle, número, comuna, depto/casa")
+                    
+                    descripcion = st.text_area(
+                        "📝 Describe el trabajo que necesitas",
+                        placeholder="Detalles específicos del servicio que necesitas...",
+                        height=100
+                    )
+                    
+                    # Si el servicio no tiene precio fijo
+                    if not servicio.get('price'):
+                        precio_propuesto = st.number_input("💵 Propón un precio", min_value=0, step=1000)
+                    else:
+                        precio_propuesto = servicio['price']
+                    
+                    col_btn1, col_btn2 = st.columns(2)
+                    
+                    with col_btn1:
+                        submit = st.form_submit_button("✅ Enviar solicitud", use_container_width=True)
+                    
+                    with col_btn2:
+                        cancel = st.form_submit_button("❌ Cancelar", use_container_width=True)
+                    
+                    if submit:
+                        if not direccion or not descripcion:
+                            st.error("Por favor completa todos los campos obligatorios.")
+                        else:
+                            # Crear el trabajo
+                            trabajo_id = db.create_trabajo(
+                                servicio_id,
+                                current_user_id(),
+                                trabajador_id,
+                                fecha.isoformat(),
+                                hora.strftime("%H:%M"),
+                                direccion,
+                                descripcion,
+                                precio_propuesto if not servicio.get('price') else None
+                            )
+                            
+                            if trabajo_id:
+                                # Notificar al trabajador
+                                db.add_notification(
+                                    trabajador_id,
+                                    "solicitud_trabajo",
+                                    f"Nueva solicitud de {current_user_name()} para {servicio['service']}"
+                                )
+                                
+                                st.success("¡Solicitud enviada! El trabajador recibirá una notificación.")
+                                st.balloons()
+                                
+                                # Limpiar session state
+                                st.session_state.solicitar_servicio_id = None
+                                st.session_state.solicitar_trabajador_id = None
+                                st.session_state.page = "mis_trabajos"
+                                rerun_safe()
+                            else:
+                                st.error("Error al crear la solicitud. Intenta nuevamente.")
+                    
+                    if cancel:
+                        st.session_state.solicitar_servicio_id = None
+                        st.session_state.solicitar_trabajador_id = None
+                        st.session_state.page = "resultados"
+                        rerun_safe()
+            else:
+                st.error("Servicio no encontrado.")
+                if st.button("⬅️ Volver"):
+                    st.session_state.page = "resultados"
+                    rerun_safe()
+# ---------- MIS TRABAJOS ----------
+elif st.session_state.get("page") == "mis_trabajos":
+    st.markdown('<h1 class="conecta-title">📋 Mis Trabajos</h1>', unsafe_allow_html=True)
+    
+    if not current_user_id():
+        st.warning("Debes iniciar sesión para ver tus trabajos.")
+    else:
+        # Tabs para separar trabajos solicitados y recibidos
+        tab1, tab2 = st.tabs(["📤 Solicitados por mí", "📥 Recibidos (como trabajador)"])
+        
+        with tab1:
+            st.subheader("Trabajos que has solicitado")
+            trabajos_cliente = db.get_trabajos_cliente(current_user_id())
+            
+            if trabajos_cliente:
+                for trabajo in trabajos_cliente:
+                    estado_emoji = {
+                        "pendiente": "⏳",
+                        "aceptado": "✅",
+                        "rechazado": "❌",
+                        "completado": "🎉",
+                        "evaluado": "⭐",
+                        "cancelado": "🚫"
+                    }
+                    
+                    emoji = estado_emoji.get(trabajo['estado'], "📋")
+                    
+                    with st.expander(f"{emoji} {trabajo['servicio_nombre']} - {trabajo['trabajador_nombre']} ({trabajo['estado'].upper()})"):
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            st.write(f"**Fecha:** {trabajo['fecha_solicitada']}")
+                            st.write(f"**Hora:** {trabajo['hora_solicitada']}")
+                            st.write(f"**Dirección:** {trabajo['direccion']}")
+                        
+                        with col2:
+                            st.write(f"**Estado:** {trabajo['estado'].upper()}")
+                            if trabajo.get('precio_propuesto'):
+                                st.write(f"**Precio propuesto:** ${int(trabajo['precio_propuesto'])}")
+                            if trabajo.get('precio_final'):
+                                st.write(f"**Precio final:** ${int(trabajo['precio_final'])}")
+                        
+                        st.write(f"**Descripción:** {trabajo['descripcion']}")
+                        
+                        # Botones según estado
+                        if trabajo['estado'] == "completado":
+                            if st.button("⭐ Evaluar trabajo", key=f"evaluar_{trabajo['id']}"):
+                                st.session_state.ver_trabajo_id = trabajo['id']
+                                st.session_state.page = "evaluar_trabajo"
+                                rerun_safe()
+                        
+                        if trabajo['estado'] == "evaluado":
+                            st.success("✅ Ya evaluaste este trabajo")
+                        
+                        # Ver fotos si las hay
+                        fotos = db.get_fotos_trabajo(trabajo['id'])
+                        if fotos:
+                            st.write("**📸 Fotos del trabajo:**")
+                            cols_fotos = st.columns(min(len(fotos), 3))
+                            for idx, foto in enumerate(fotos[:3]):
+                                with cols_fotos[idx % 3]:
+                                    try:
+                                        import base64
+                                        st.image(base64.b64decode(foto['foto_base64']))
+                                        if foto.get('descripcion'):
+                                            st.caption(foto['descripcion'])
+                                    except Exception:
+                                        st.write("Error al cargar foto")
+            else:
+                st.info("No has solicitado ningún trabajo aún.")
+        
+        with tab2:
+            st.subheader("Trabajos recibidos")
+            trabajos_trabajador = db.get_trabajos_trabajador(current_user_id())
+            
+            if trabajos_trabajador:
+                for trabajo in trabajos_trabajador:
+                    estado_emoji = {
+                        "pendiente": "⏳",
+                        "aceptado": "✅",
+                        "rechazado": "❌",
+                        "completado": "🎉",
+                        "evaluado": "⭐",
+                        "cancelado": "🚫"
+                    }
+                    
+                    emoji = estado_emoji.get(trabajo['estado'], "📋")
+                    
+                    with st.expander(f"{emoji} {trabajo['servicio_nombre']} - Cliente: {trabajo['cliente_nombre']} ({trabajo['estado'].upper()})"):
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            st.write(f"**Fecha:** {trabajo['fecha_solicitada']}")
+                            st.write(f"**Hora:** {trabajo['hora_solicitada']}")
+                            st.write(f"**Dirección:** {trabajo['direccion']}")
+                        
+                        with col2:
+                            st.write(f"**Estado:** {trabajo['estado'].upper()}")
+                            if trabajo.get('precio_propuesto'):
+                                st.write(f"**Precio propuesto:** ${int(trabajo['precio_propuesto'])}")
+                            if trabajo.get('precio_final'):
+                                st.write(f"**Precio final:** ${int(trabajo['precio_final'])}")
+                        
+                        st.write(f"**Descripción:** {trabajo['descripcion']}")
+                        
+                        # Acciones según estado
+                        if trabajo['estado'] == "pendiente":
+                            col_btn1, col_btn2 = st.columns(2)
+                            with col_btn1:
+                                if st.button("✅ Aceptar", key=f"aceptar_{trabajo['id']}", use_container_width=True):
+                                    db.update_trabajo_estado(trabajo['id'], "aceptado")
+                                    db.add_notification(
+                                        trabajo['cliente_id'],
+                                        "trabajo_aceptado",
+                                        f"{current_user_name()} aceptó tu solicitud de {trabajo['servicio_nombre']}"
+                                    )
+                                    st.success("Trabajo aceptado")
+                                    rerun_safe()
+                            
+                            with col_btn2:
+                                if st.button("❌ Rechazar", key=f"rechazar_{trabajo['id']}", use_container_width=True):
+                                    db.update_trabajo_estado(trabajo['id'], "rechazado")
+                                    db.add_notification(
+                                        trabajo['cliente_id'],
+                                        "trabajo_rechazado",
+                                        f"{current_user_name()} rechazó tu solicitud de {trabajo['servicio_nombre']}"
+                                    )
+                                    st.warning("Trabajo rechazado")
+                                    rerun_safe()
+                        
+                        elif trabajo['estado'] == "aceptado":
+                            if st.button("🎉 Marcar como completado", key=f"completar_{trabajo['id']}"):
+                                st.session_state.ver_trabajo_id = trabajo['id']
+                                st.session_state.page = "completar_trabajo"
+                                rerun_safe()
+                        
+                        elif trabajo['estado'] in ["completado", "evaluado"]:
+                            if trabajo.get('comentario_trabajador'):
+                                st.info(f"**Tu comentario:** {trabajo['comentario_trabajador']}")
+                            
+                            # Mostrar fotos
+                            fotos = db.get_fotos_trabajo(trabajo['id'])
+                            if fotos:
+                                st.write("**📸 Fotos subidas:**")
+                                cols_fotos = st.columns(min(len(fotos), 3))
+                                for idx, foto in enumerate(fotos):
+                                    with cols_fotos[idx % 3]:
+                                        try:
+                                            import base64
+                                            st.image(base64.b64decode(foto['foto_base64']))
+                                            if foto.get('descripcion'):
+                                                st.caption(foto['descripcion'])
+                                        except Exception:
+                                            st.write("Error al cargar foto")
+            else:
+                st.info("No has recibido solicitudes de trabajo aún.")
 # ---------- LOGIN / REGISTRO ----------
 elif st.session_state.get("page") in ["login", "registro"]:
     if st.session_state.get("page") == "login":
