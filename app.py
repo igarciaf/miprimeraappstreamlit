@@ -261,22 +261,10 @@ elif st.session_state.get("page") == "ubicacion":
         st.session_state.page = "subcategoria"
         rerun_safe()
 
-    st.write("Selecciona la comuna donde quieres buscar (esto limitará los resultados):")
+    st.write("Selecciona la comuna donde quieres buscar el servicio:")
     ciudad = st.selectbox("Ciudad:", ["Santiago"], index=0, key="ubic_ciudad")
     comuna = st.selectbox("Comuna:", [""] + comunas_santiago, index=0, key="ubic_comuna")
-    st.write("(Opcional) muestra una vista del mapa centrada en la comuna seleccionada.")
-    # muestra mapa simple centrado en Santiago si se selecciona cualquiera (placeholder)
-    if comuna:
-        # marcador simple en el centro de Santiago (placeholder); puedes reemplazar por geocoding real
-        df_map = None
-        try:
-            import pandas as pd
-            # punto central de Santiago (se usa como placeholder)
-            coords = {"lat": -33.45, "lon": -70.6667}
-            df_map = pd.DataFrame([coords])
-            st.map(df_map)
-        except Exception:
-            st.info("Mapa no disponible (entorno).")
+    
     if st.button("Buscar resultados en esta ubicación", key="ubic_buscar_btn"):
         if not comuna:
             st.warning("Selecciona una comuna para limitar la búsqueda.")
@@ -284,7 +272,6 @@ elif st.session_state.get("page") == "ubicacion":
             st.session_state.ubicacion = f"{comuna}, {ciudad}"
             st.session_state.page = "resultados"
             rerun_safe()
-
 
 # ---------- RESULTADOS ----------
 elif st.session_state.get("page") == "resultados":
@@ -299,23 +286,49 @@ elif st.session_state.get("page") == "resultados":
             st.session_state.page = "inicio"
         rerun_safe()
 
-    # filtros opcionales (precio mínimo/máximo y rating mínimo — rating es ficticio si la BD no lo tiene)
-    with st.expander("Filtros opcionales (precio / valoración)"):
-        pmin = st.text_input("Precio mínimo", value=st.session_state.get("results_filter_price_min", ""), key="f_pmin")
-        pmax = st.text_input("Precio máximo", value=st.session_state.get("results_filter_price_max", ""), key="f_pmax")
-        rating_min = st.text_input("Valoración mínima (1-5)", value=st.session_state.get("results_filter_rating_min", ""), key="f_rating")
-        if st.button("Aplicar filtros", key="apply_result_filters"):
+    # Filtros en una sola fila
+    st.subheader("Filtros y Ordenamiento")
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        pmin = st.text_input("💰 Precio mín", value=st.session_state.get("results_filter_price_min", ""), key="f_pmin", placeholder="Ej: 5000")
+    
+    with col2:
+        pmax = st.text_input("💰 Precio máx", value=st.session_state.get("results_filter_price_max", ""), key="f_pmax", placeholder="Ej: 50000")
+    
+    with col3:
+        # Opciones de ordenamiento
+        orden_opciones = [
+            "Más recientes primero",
+            "Precio: menor a mayor",
+            "Precio: mayor a menor",
+            "Alfabético (A-Z)",
+            "Alfabético (Z-A)"
+        ]
+        orden_seleccionado = st.selectbox(
+            "🔽 Ordenar por",
+            orden_opciones,
+            index=0,
+            key="orden_select"
+        )
+    
+    with col4:
+        st.write("")  # Espaciado
+        st.write("")  # Espaciado
+        if st.button("Aplicar", key="apply_result_filters", use_container_width=True):
             st.session_state.results_filter_price_min = pmin
             st.session_state.results_filter_price_max = pmax
-            st.session_state.results_filter_rating_min = rating_min
+            st.session_state.results_order = orden_seleccionado
             rerun_safe()
+
+    st.markdown("---")
 
     # obtener servicios de la BD (usa get_services_filtered)
     term = servicio or ""
     comuna_name = ubic.split(",")[0] if ubic else None
     servicios = db.get_services_filtered(term, comuna_name)
 
-    # aplicar filtros locales (precio / rating) -> rating no existe en tu BD, así que sólo filtramos price si existe
+    # aplicar filtros locales (precio)
     filtered_services = []
     for s in servicios:
         ok = True
@@ -332,24 +345,41 @@ elif st.session_state.get("page") == "resultados":
         if price is not None and pmax_v is not None and price > pmax_v:
             ok = False
 
-        # rating: si tu BD no tiene ratings esto no filtra (placeholder)
-        # if 'rating' in s and st.session_state.get("results_filter_rating_min"):
-        #     try:
-        #         if float(s.get('rating', 0)) < float(st.session_state.get("results_filter_rating_min")):
-        #             ok = False
-        #     except Exception:
-        #         pass
-
         if ok:
             filtered_services.append(s)
 
+    # Aplicar ordenamiento
+    orden = st.session_state.get("results_order", "Más recientes primero")
+    
+    if orden == "Precio: menor a mayor":
+        # Poner primero los que tienen precio, luego los que no
+        with_price = [s for s in filtered_services if s.get("price") is not None]
+        without_price = [s for s in filtered_services if s.get("price") is None]
+        with_price.sort(key=lambda x: x["price"])
+        filtered_services = with_price + without_price
+        
+    elif orden == "Precio: mayor a menor":
+        with_price = [s for s in filtered_services if s.get("price") is not None]
+        without_price = [s for s in filtered_services if s.get("price") is None]
+        with_price.sort(key=lambda x: x["price"], reverse=True)
+        filtered_services = with_price + without_price
+        
+    elif orden == "Alfabético (A-Z)":
+        filtered_services.sort(key=lambda x: x["service"].lower())
+        
+    elif orden == "Alfabético (Z-A)":
+        filtered_services.sort(key=lambda x: x["service"].lower(), reverse=True)
+        
+    # "Más recientes primero" ya viene así de la BD (ORDER BY id DESC)
+
     if filtered_services:
         st.success(f"{len(filtered_services)} resultado(s) encontrados")
+        
         for s in filtered_services:
             st.markdown(
                 f'<div class="service-card"><b>{s["service"]}</b> — {s["category"]} <br>'
-                f'Proveedor: <b>{s["user_nombre"]}</b> — {s.get("user_comuna") or "Sin comuna"}<br>'
-                f'Precio: {("$"+str(s["price"])) if s.get("price") else "No informado"}<br>'
+                f'Proveedor: <b>{s["user_nombre"]}</b> — {s.get("comunas") or "Sin comunas"}<br>'
+                f'Precio: {("$"+str(int(s["price"]))) if s.get("price") else "A convenir"}<br>'
                 f'<i>{s.get("user_bio") or ""}</i></div>',
                 unsafe_allow_html=True,
             )
@@ -372,7 +402,7 @@ elif st.session_state.get("page") == "resultados":
                     st.session_state.page = "chats"
                     rerun_safe()
     else:
-        st.info("No hay servicios publicados que coincidan (aún).")
+        st.info("No hay servicios publicados que coincidan con tu búsqueda.")
 
 
 # ---------- PERFIL PÚBLICO ----------
