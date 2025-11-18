@@ -14,6 +14,24 @@ def get_conn():
 def init_db():
     conn = get_conn()
     cur = conn.cursor()
+def get_user_by_email(email: str):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM users WHERE email = ?", (email,))
+    row = cur.fetchone()
+    conn.close()
+    return row
+def create_user(nombre: str, email: str, password_hash: str, bio: str, comuna: str) -> int:
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO users (nombre, email, password_hash, bio, comuna, created_at)
+        VALUES (?, ?, ?, ?, ?, datetime('now'))
+    """, (nombre, email, password_hash, bio, comuna))
+    conn.commit()
+    new_id = cur.lastrowid
+    conn.close()
+    return new_id
     
     # users
     cur.execute("""
