@@ -139,7 +139,7 @@ def create_user(nombre: str, email: str, password_hash: str, bio: Optional[str]=
             (nombre, email, password_hash, bio, comuna, created_at)
         )
         conn.commit()
-        user_id = cur.lastrowi
+        user_id = cur.lastrowid
 def get_services_filtered(term: str, comuna: Optional[str] = None) -> List[Dict]:
     """Buscar servicios por nombre y opcionalmente por comuna."""
     conn = get_conn()
