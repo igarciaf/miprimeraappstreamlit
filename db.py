@@ -129,7 +129,8 @@ def init_db():
     conn.commit()
     conn.close()
 # --- Users ---
-def create_user(nombre: str, email: str, password_hash: str, bio: Optional[str]=None, comuna: Optional[str]=None) -> int:
+# --- Users ---
+def create_user(nombre: str, email: str, password_hash: str, bio: Optional[str]=None, comuna: Optional[str] = None) -> int:
     conn = get_conn()
     cur = conn.cursor()
     created_at = datetime.utcnow().isoformat()
@@ -142,13 +143,40 @@ def create_user(nombre: str, email: str, password_hash: str, bio: Optional[str]=
         conn.commit()
         user_id = cur.lastrowid
         return user_id
-    
+
     except Exception as e:
         print("Error al crear usuario:", e)
         return -1
-    
+
     finally:
         conn.close()
+
+
+# --- SERVICES ---
+def get_services_filtered(term: str, comuna: Optional[str] = None) -> List[Dict]:
+    """Buscar servicios por nombre y opcionalmente por comuna."""
+    conn = get_conn()
+    cur = conn.cursor()
+
+    sql = """
+        SELECT s.*, u.nombre AS user_nombre, u.comuna AS user_comuna, u.bio AS user_bio
+        FROM services s
+        JOIN users u ON s.user_id = u.id
+        WHERE s.service LIKE ? OR s.category LIKE ?
+    """
+    params = [f"%{term}%", f"%{term}%"]
+
+    if comuna:
+        sql += " AND (s.comunas LIKE ? OR u.comuna = ?)"
+        params.extend([f"%{comuna}%", comuna])
+
+    sql += " ORDER BY s.created_at DESC"
+
+    cur.execute(sql, params)
+    rows = cur.fetchall()
+    conn.close()
+
+    return [dict(r) for r in rows]
         
 # ============ TRABAJOS ============
 
