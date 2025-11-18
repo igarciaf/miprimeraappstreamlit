@@ -279,38 +279,45 @@ elif st.session_state.get("page") == "ubicacion":
             rerun_safe()
 # ---------- RESULTADOS ----------
 elif st.session_state.get("page") == "resultados":
-    st.markdown('<h1 class="conecta-title">🔎 Resultados de búsqueda</h1>', unsafe_allow_html=True)
-
-    servicio = st.session_state.get("servicio")
-    ubic = st.session_state.get("ubicacion")
-
+    servicio = st.session_state.get("servicio", "") or st.session_state.get("search_term", "")
+    ubic = st.session_state.get("ubicacion", "") or (st.session_state.get("search_comuna") and f"{st.session_state.get('search_comuna')}, Santiago") or ""
+    st.markdown(f'<h1 class="conecta-title">Resultados: {servicio} — {ubic or "Todas las comunas"}</h1>', unsafe_allow_html=True)
+    
     if st.button("⬅️ Volver", key="volver_resultados"):
-        st.session_state.page = "ubicacion"
+        if st.session_state.get("servicio") and st.session_state.get("ubicacion"):
+            st.session_state.page = "ubicacion"
+        else:
+            st.session_state.page = "inicio"
         rerun_safe()
 
-    st.write(f"**Servicio:** {servicio}")
-    st.write(f"**Ubicación:** {ubic}")
-
-    st.markdown("---")
-    st.subheader("Filtrar resultados")
-
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        st.text_input("Precio mínimo", key="results_filter_price_min")
-    with c2:
-        st.text_input("Precio máximo", key="results_filter_price_max")
-    with c3:
-        st.selectbox(
-            "Ordenar por",
-            [
-                "Más recientes primero",
-                "Precio: menor a mayor",
-                "Precio: mayor a menor",
-                "Alfabético (A-Z)",
-                "Alfabético (Z-A)"
-            ],
-            key="results_order"
-        )
+    # Filtros en una sola fila
+    st.subheader("Filtros y Ordenamiento")
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        pmin = st.text_input("💰 Precio mín", value=st.session_state.get("results_filter_price_min", ""), key="f_pmin", placeholder="Ej: 5000")
+    
+    with col2:
+        pmax = st.text_input("💰 Precio máx", value=st.session_state.get("results_filter_price_max", ""), key="f_pmax", placeholder="Ej: 50000")
+    
+    with col3:
+        orden_opciones = [
+            "Más recientes primero",
+            "Precio: menor a mayor",
+            "Precio: mayor a menor",
+            "Alfabético (A-Z)",
+            "Alfabético (Z-A)"
+        ]
+        orden_seleccionado = st.selectbox("🔽 Ordenar por", orden_opciones, index=0, key="orden_select")
+    
+    with col4:
+        st.write("")
+        st.write("")
+        if st.button("Aplicar", key="apply_result_filters", use_container_width=True):
+            st.session_state.results_filter_price_min = pmin
+            st.session_state.results_filter_price_max = pmax
+            st.session_state.results_order = orden_seleccionado
+            rerun_safe()
 
     st.markdown("---")
 
@@ -319,134 +326,10 @@ elif st.session_state.get("page") == "resultados":
     comuna_name = ubic.split(",")[0] if ubic else None
     servicios = db.get_services_filtered(term, comuna_name)
 
-    # aplicar filtros de precio
-    filtered_services = []
-    try:
-        pmin = float(st.session_state.get("results_filter_price_min")) if st.session_state.get("results_filter_price_min") else None
-        pmax = float(st.session_state.get("results_filter_price_max")) if st.session_state.get("results_filter_price_max") else None
-    except:
-        pmin = pmax = None
-
-    for s in servicios:
-        precio = s.get("price")
-        ok = True
-        if precio is not None and pmin is not None and precio < pmin:
-            ok = False
-        if precio is not None and pmax is not None and precio > pmax:
-            ok = False
-        if ok:
-            filtered_services.append(s)
-
-    # ordenar
-    orden = st.session_state.get("results_order", "Más recientes primero")
-
-    if orden == "Precio: menor a mayor":
-        filtered_services.sort(key=lambda x: (x["price"] is None, x["price"]))
-    elif orden == "Precio: mayor a menor":
-        filtered_services.sort(key=lambda x: (x["price"] is None, -x["price"] if x["price"] else 0))
-    elif orden == "Alfabético (A-Z)":
-        filtered_services.sort(key=lambda x: x["service"].lower())
-    elif orden == "Alfabético (Z-A)":
-        filtered_services.sort(key=lambda x: x["service"].lower(), reverse=True)
-
-    if filtered_services:
-        st.success(f"{len(filtered_services)} resultado(s) encontrados")
-
-        for s in filtered_services:
-            st.markdown(
-                f'<div class="service-card"><b>{s["service"]}</b> — {s["category"]} <br>'
-                f'Proveedor: <b>{s["user_nombre"]}</b> — {s.get("comuna") or "Sin comuna"}<br>'
-                f'Precio: {("$"+str(int(s["price"]))) if s.get("price") else "A convenir"}<br>'
-                f'<i>{s.get("user_bio") or ""}</i></div>',
-                unsafe_allow_html=True
-            )
-
-            cols = st.columns([1, 1, 1])
-
-            with cols[0]:
-                if st.button("👤 Ver perfil", key=f"verperfil_{s['id']}"):
-                    st.session_state.perfil_usuario = {
-                        "id": s["user_id"],
-                        "nombre": s["user_nombre"],
-                        "servicio": s["service"],
-                        "valoracion": s.get("rating", "N/A"),
-                        "bio": s.get("user_bio")
-                    }
-                    st.session_state.page = "perfil_publico"
-                    rerun_safe()
-
-            with cols[1]:
-                if st.button("💬 Chatear", key=f"chat_result_{s['id']}"):
-                    st.session_state.selected_user_id = s["user_id"]
-                    st.session_state.page = "chats"
-                    rerun_safe()
-
-            with cols[2]:
-                if current_user_id() and current_user_id() != s["user_id"]:
-                    if st.button("✅ Solicitar", key=f"solicitar_result_{s['id']}"):
-                        st.session_state.solicitar_servicio_id = s["id"]
-                        st.session_state.solicitar_trabajador_id = s["user_id"]
-                        st.session_state.page = "solicitar_servicio"
-                        rerun_safe()
-
-            st.markdown("---")
-    else:
-        st.info("No hay servicios publicados que coincidan con tu búsqueda.")
-
-for s in servicios:
-    st.markdown(
-        f'<div class="service-card"><b>{s["service"]}</b> — {s["category"]} <br>'
-        f'Proveedor: <b>{s["user_nombre"]}</b> — {s.get("user_comuna") or "Sin comuna"}<br>'
-        f'Precio: {("$"+str(s["price"])) if s.get("price") else "No informado"}<br>'
-        f'<i>{s.get("user_bio") or ""}</i></div>',
-        unsafe_allow_html=True
-    )
-
-    # ---------------- NUEVOS BOTONES ----------------
-    cols = st.columns([1, 1, 1])
-
-    # 1) VER PERFIL
-    with cols[0]:
-        if st.button("👤 Ver perfil", key=f"verperfil_{s['id']}"):
-            st.session_state.perfil_usuario = {
-                "id": s.get("user_id"),
-                "nombre": s.get("user_nombre"),
-                "servicio": s.get("service"),
-                "valoracion": s.get("rating", "N/A"),
-                "bio": s.get("user_bio")
-            }
-            st.session_state.page = "perfil_publico"
-            rerun_safe()
-
-    # 2) CHATEAR
-    with cols[1]:
-        if st.button(f"💬 Chatear", key=f"chat_result_{s['id']}"):
-            st.session_state.selected_user_id = s["user_id"]
-            st.session_state.page = "chats"
-            rerun_safe()
-
-    # 3) SOLICITAR (solo si no es su propio servicio)
-    with cols[2]:
-        if current_user_id() and current_user_id() != s["user_id"]:
-            if st.button(f"✅ Solicitar", key=f"solicitar_result_{s['id']}"):
-                st.session_state.solicitar_servicio_id = s["id"]
-                st.session_state.solicitar_trabajador_id = s["user_id"]
-                st.session_state.page = "solicitar_servicio"
-                rerun_safe()
-
-
-    st.markdown("---")
-
-    # obtener servicios de la BD (usa get_services_filtered)
-    term = servicio or ""
-    comuna_name = ubic.split(",")[0] if ubic else None
-    servicios = db.get_services_filtered(term, comuna_name)
-
     # aplicar filtros locales (precio)
     filtered_services = []
     for s in servicios:
         ok = True
-        # precio
         try:
             pmin_v = float(st.session_state.get("results_filter_price_min")) if st.session_state.get("results_filter_price_min") else None
             pmax_v = float(st.session_state.get("results_filter_price_max")) if st.session_state.get("results_filter_price_max") else None
@@ -466,7 +349,6 @@ for s in servicios:
     orden = st.session_state.get("results_order", "Más recientes primero")
     
     if orden == "Precio: menor a mayor":
-        # Poner primero los que tienen precio, luego los que no
         with_price = [s for s in filtered_services if s.get("price") is not None]
         without_price = [s for s in filtered_services if s.get("price") is None]
         with_price.sort(key=lambda x: x["price"])
@@ -483,8 +365,6 @@ for s in servicios:
         
     elif orden == "Alfabético (Z-A)":
         filtered_services.sort(key=lambda x: x["service"].lower(), reverse=True)
-        
-    # "Más recientes primero" ya viene así de la BD (ORDER BY id DESC)
 
     if filtered_services:
         st.success(f"{len(filtered_services)} resultado(s) encontrados")
@@ -497,10 +377,11 @@ for s in servicios:
                 f'<i>{s.get("user_bio") or ""}</i></div>',
                 unsafe_allow_html=True,
             )
-            cols = st.columns([1, 1])
+            
+            cols = st.columns([1, 1, 1])
+            
             with cols[0]:
-                if st.button("Ver perfil", key=f"verperfil_{s['id']}"):
-                    # guardamos perfil y abrimos página pública de perfil
+                if st.button("👤 Ver perfil", key=f"verperfil_{s['id']}"):
                     st.session_state.perfil_usuario = {
                         "id": s.get("user_id"),
                         "nombre": s.get("user_nombre"),
@@ -510,11 +391,20 @@ for s in servicios:
                     }
                     st.session_state.page = "perfil_publico"
                     rerun_safe()
+            
             with cols[1]:
-                if st.button(f"Chatear con {s['user_nombre']}", key=f"chat_result_{s['id']}"):
+                if st.button(f"💬 Chatear", key=f"chat_result_{s['id']}"):
                     st.session_state.selected_user_id = s["user_id"]
                     st.session_state.page = "chats"
                     rerun_safe()
+            
+            with cols[2]:
+                if current_user_id() and current_user_id() != s["user_id"]:
+                    if st.button(f"✅ Solicitar", key=f"solicitar_result_{s['id']}"):
+                        st.session_state.solicitar_servicio_id = s["id"]
+                        st.session_state.solicitar_trabajador_id = s["user_id"]
+                        st.session_state.page = "solicitar_servicio"
+                        rerun_safe()
     else:
         st.info("No hay servicios publicados que coincidan con tu búsqueda.")
 
