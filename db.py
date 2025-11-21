@@ -14,24 +14,6 @@ def get_conn():
 def init_db():
     conn = get_conn()
     cur = conn.cursor()
-def get_user_by_email(email: str):
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM users WHERE email = ?", (email,))
-    row = cur.fetchone()
-    conn.close()
-    return row
-def create_user(nombre: str, email: str, password_hash: str, bio: str, comuna: str) -> int:
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute("""
-        INSERT INTO users (nombre, email, password_hash, bio, comuna, created_at)
-        VALUES (?, ?, ?, ?, ?, datetime('now'))
-    """, (nombre, email, password_hash, bio, comuna))
-    conn.commit()
-    new_id = cur.lastrowid
-    conn.close()
-    return new_id
     
     # users
     cur.execute("""
@@ -85,8 +67,6 @@ def create_user(nombre: str, email: str, password_hash: str, bio: str, comuna: s
         FOREIGN KEY (usuario_id) REFERENCES users(id)
     )
     """)
-    
-    # ============ NUEVAS TABLAS ============
     
     # trabajos (solicitudes de servicio)
     cur.execute("""
@@ -146,56 +126,9 @@ def create_user(nombre: str, email: str, password_hash: str, bio: str, comuna: s
     
     conn.commit()
     conn.close()
-# --- Users ---
-# --- Users ---
-def create_user(nombre: str, email: str, password_hash: str, bio: Optional[str]=None, comuna: Optional[str] = None) -> int:
-    conn = get_conn()
-    cur = conn.cursor()
-    created_at = datetime.utcnow().isoformat()
 
-    try:
-        cur.execute(
-            "INSERT INTO users (nombre, email, password_hash, bio, comuna, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-            (nombre, email, password_hash, bio, comuna, created_at)
-        )
-        conn.commit()
-        user_id = cur.lastrowid
-        return user_id
+# ============ USERS ============
 
-    except Exception as e:
-        print("Error al crear usuario:", e)
-        return -1
-
-    finally:
-        conn.close()
-
-
-# --- SERVICES ---
-def get_services_filtered(term: str, comuna: Optional[str] = None) -> List[Dict]:
-    """Buscar servicios por nombre y opcionalmente por comuna."""
-    conn = get_conn()
-    cur = conn.cursor()
-
-    sql = """
-        SELECT s.*, u.nombre AS user_nombre, u.comuna AS user_comuna, u.bio AS user_bio
-        FROM services s
-        JOIN users u ON s.user_id = u.id
-        WHERE s.service LIKE ? OR s.category LIKE ?
-    """
-    params = [f"%{term}%", f"%{term}%"]
-
-    if comuna:
-        sql += " AND (s.comunas LIKE ? OR u.comuna = ?)"
-        params.extend([f"%{comuna}%", comuna])
-
-    sql += " ORDER BY s.created_at DESC"
-
-    cur.execute(sql, params)
-    rows = cur.fetchall()
-    conn.close()
-
-    return [dict(r) for r in rows]
-# --- Users ---
 def create_user(nombre: str, email: str, password_hash: str, bio: Optional[str]=None, comuna: Optional[str]=None) -> int:
     conn = get_conn()
     cur = conn.cursor()
@@ -242,11 +175,9 @@ def update_user_profile(user_id: int, nombre: str=None, bio: str=None, comuna: s
     conn.commit()
     conn.close()
 
-# --- Services ---
+# ============ SERVICES ============
+
 def add_service(user_id: int, category: str, service: str, comunas: Optional[str]=None, price: Optional[float]=None) -> int:
-    """
-    comunas puede ser una string con comunas separadas por coma: "Providencia,Las Condes,Ñuñoa"
-    """
     conn = get_conn()
     cur = conn.cursor()
     created_at = datetime.utcnow().isoformat()
@@ -274,7 +205,6 @@ def get_services_filtered(term: str, comuna: Optional[str]=None) -> List[Dict]:
     cur = conn.cursor()
     term_like = f"%{term}%"
     if comuna:
-        # Buscar si la comuna está en la lista de comunas (separadas por coma)
         comuna_like = f"%{comuna}%"
         cur.execute("""
             SELECT s.*, 
@@ -304,7 +234,8 @@ def get_services_filtered(term: str, comuna: Optional[str]=None) -> List[Dict]:
     conn.close()
     return [dict(r) for r in rows]
 
-# --- Messages ---
+# ============ MESSAGES ============
+
 def add_message(emisor_id: int, receptor_id: int, contenido: str):
     if not emisor_id or not receptor_id:
         return
@@ -331,13 +262,11 @@ def get_messages_between(user_a: int, user_b: int) -> List[Dict]:
     return [dict(r) for r in rows]
 
 def get_recent_chats(user_id: int) -> List[Dict]:
-    """Obtiene lista de chats recientes con el último mensaje"""
     if not user_id:
         return []
     conn = get_conn()
     cur = conn.cursor()
     
-    # Obtener todos los mensajes donde el usuario participa
     cur.execute("""
         SELECT 
             m.id,
@@ -352,14 +281,11 @@ def get_recent_chats(user_id: int) -> List[Dict]:
     
     messages = cur.fetchall()
     
-    # Procesar mensajes para obtener conversaciones únicas
     chats_dict = {}
     for msg in messages:
         msg = dict(msg)
-        # Determinar quién es el otro usuario
         other_user_id = msg['receptor_id'] if msg['emisor_id'] == user_id else msg['emisor_id']
         
-        # Solo guardar el primer mensaje (más reciente) de cada conversación
         if other_user_id not in chats_dict:
             chats_dict[other_user_id] = {
                 'other_user_id': other_user_id,
@@ -367,7 +293,6 @@ def get_recent_chats(user_id: int) -> List[Dict]:
                 'last_timestamp': msg['timestamp']
             }
     
-    # Obtener nombres de los usuarios
     result = []
     for other_id, chat_data in chats_dict.items():
         cur.execute("SELECT nombre FROM users WHERE id = ?", (other_id,))
@@ -379,7 +304,8 @@ def get_recent_chats(user_id: int) -> List[Dict]:
     conn.close()
     return result
 
-# --- Notifications ---
+# ============ NOTIFICATIONS ============
+
 def add_notification(usuario_id: int, tipo: str, mensaje: str):
     if not usuario_id:
         return
@@ -410,13 +336,12 @@ def mark_notification_read(notification_id: int):
     cur.execute("UPDATE notifications SET leido = 1 WHERE id = ?", (notification_id,))
     conn.commit()
     conn.close()
-    
+
 # ============ TRABAJOS ============
 
 def create_trabajo(service_id: int, cliente_id: int, trabajador_id: int, 
                    fecha_solicitada: str, hora_solicitada: str, direccion: str, 
                    descripcion: str, precio_propuesto: Optional[float] = None) -> int:
-    """Crear nueva solicitud de trabajo"""
     conn = get_conn()
     cur = conn.cursor()
     fecha_creacion = datetime.utcnow().isoformat()
@@ -434,7 +359,6 @@ def create_trabajo(service_id: int, cliente_id: int, trabajador_id: int,
     return trabajo_id
 
 def get_trabajo_by_id(trabajo_id: int) -> Optional[Dict]:
-    """Obtener trabajo por ID"""
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("""
@@ -456,7 +380,6 @@ def get_trabajo_by_id(trabajo_id: int) -> Optional[Dict]:
     return dict(row) if row else None
 
 def get_trabajos_cliente(cliente_id: int) -> List[Dict]:
-    """Obtener trabajos solicitados por un cliente"""
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("""
@@ -474,7 +397,6 @@ def get_trabajos_cliente(cliente_id: int) -> List[Dict]:
     return [dict(r) for r in rows]
 
 def get_trabajos_trabajador(trabajador_id: int) -> List[Dict]:
-    """Obtener trabajos recibidos por un trabajador"""
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("""
@@ -494,7 +416,6 @@ def get_trabajos_trabajador(trabajador_id: int) -> List[Dict]:
 def update_trabajo_estado(trabajo_id: int, nuevo_estado: str, 
                           precio_final: Optional[float] = None,
                           comentario_trabajador: Optional[str] = None):
-    """Actualizar estado del trabajo"""
     conn = get_conn()
     cur = conn.cursor()
     
@@ -524,7 +445,6 @@ def create_evaluacion(trabajo_id: int, cliente_id: int, trabajador_id: int,
                      calificacion: int, comentario: str,
                      puntualidad: int, calidad: int, comunicacion: int,
                      recomendaria: int) -> int:
-    """Crear evaluación de un trabajo"""
     conn = get_conn()
     cur = conn.cursor()
     fecha = datetime.utcnow().isoformat()
@@ -538,14 +458,12 @@ def create_evaluacion(trabajo_id: int, cliente_id: int, trabajador_id: int,
     conn.commit()
     eval_id = cur.lastrowid
     
-    # Actualizar estado del trabajo a "evaluado"
     cur.execute("UPDATE trabajos SET estado = ? WHERE id = ?", ("evaluado", trabajo_id))
     conn.commit()
     conn.close()
     return eval_id
 
 def get_evaluaciones_trabajador(trabajador_id: int) -> List[Dict]:
-    """Obtener todas las evaluaciones de un trabajador"""
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("""
@@ -565,7 +483,6 @@ def get_evaluaciones_trabajador(trabajador_id: int) -> List[Dict]:
     return [dict(r) for r in rows]
 
 def get_promedio_calificacion(trabajador_id: int) -> float:
-    """Obtener promedio de calificaciones de un trabajador"""
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("""
@@ -578,23 +495,18 @@ def get_promedio_calificacion(trabajador_id: int) -> float:
     return round(row['promedio'], 1) if row and row['promedio'] else 0.0
 
 def get_estadisticas_trabajador(trabajador_id: int) -> Dict:
-    """Obtener estadísticas del trabajador"""
     conn = get_conn()
     cur = conn.cursor()
     
-    # Total trabajos completados
     cur.execute("SELECT COUNT(*) as total FROM trabajos WHERE trabajador_id = ? AND estado IN ('completado', 'evaluado')",
                (trabajador_id,))
     completados = cur.fetchone()['total']
     
-    # Total evaluaciones
     cur.execute("SELECT COUNT(*) as total FROM evaluaciones WHERE trabajador_id = ?", (trabajador_id,))
     evaluaciones = cur.fetchone()['total']
     
-    # Promedio calificación
     promedio = get_promedio_calificacion(trabajador_id)
     
-    # Promedio puntualidad, calidad, comunicación
     cur.execute("""
         SELECT AVG(puntualidad) as puntualidad,
                AVG(calidad) as calidad,
@@ -620,7 +532,6 @@ def get_estadisticas_trabajador(trabajador_id: int) -> Dict:
 # ============ FOTOS DE TRABAJOS ============
 
 def add_foto_trabajo(trabajo_id: int, foto_base64: str, descripcion: Optional[str] = None):
-    """Agregar foto a un trabajo"""
     conn = get_conn()
     cur = conn.cursor()
     fecha = datetime.utcnow().isoformat()
@@ -630,7 +541,6 @@ def add_foto_trabajo(trabajo_id: int, foto_base64: str, descripcion: Optional[st
     conn.close()
 
 def get_fotos_trabajo(trabajo_id: int) -> List[Dict]:
-    """Obtener fotos de un trabajo"""
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("SELECT * FROM fotos_trabajos WHERE trabajo_id = ? ORDER BY fecha", (trabajo_id,))
@@ -639,7 +549,6 @@ def get_fotos_trabajo(trabajo_id: int) -> List[Dict]:
     return [dict(r) for r in rows]
 
 def get_fotos_trabajador(trabajador_id: int, limit: int = 10) -> List[Dict]:
-    """Obtener fotos recientes de trabajos de un trabajador (para galería de perfil)"""
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("""
