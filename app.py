@@ -596,7 +596,7 @@ else:
 stats = db.get_estadisticas_trabajador(user["id"])
 if stats['total_evaluaciones'] > 0:
                 st.write(f"⭐ **Calificación promedio:** {stats['promedio_general']} / 5 ({stats['total_evaluaciones']} evaluaciones)")
-            else:
+else:
                 st.write("⭐ Sin evaluaciones todavía")
 
                 st.subheader("Tus publicaciones")
