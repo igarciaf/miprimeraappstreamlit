@@ -770,161 +770,41 @@ elif st.session_state.get("page") == "solicitar_servicio":
                     st.session_state.page = "resultados"
                     rerun_safe()
 # ---------- MIS TRABAJOS ----------
-elif st.session_state.get("page") == "mis_trabajos":
-    st.markdown('<h1 class="conecta-title">📋 Mis Trabajos</h1>', unsafe_allow_html=True)
-    
-    if not current_user_id():
-        st.warning("Debes iniciar sesión para ver tus trabajos.")
-    else:
-        # Tabs para separar trabajos solicitados y recibidos
-        tab1, tab2 = st.tabs(["📤 Solicitados por mí", "📥 Recibidos (como trabajador)"])
+elif trabajo['estado'] == "aceptado":
+    if st.button("🎉 Marcar como completado", key=f"completar_{trabajo['id']}"):
         
-        with tab1:
-            st.subheader("Trabajos que has solicitado")
-            trabajos_cliente = db.get_trabajos_cliente(current_user_id())
-            
-            if trabajos_cliente:
-                for trabajo in trabajos_cliente:
-                    estado_emoji = {
-                        "pendiente": "⏳",
-                        "aceptado": "✅",
-                        "rechazado": "❌",
-                        "completado": "🎉",
-                        "evaluado": "⭐",
-                        "cancelado": "🚫"
-                    }
-                    
-                    emoji = estado_emoji.get(trabajo['estado'], "📋")
-                    
-                    with st.expander(f"{emoji} {trabajo['servicio_nombre']} - {trabajo['trabajador_nombre']} ({trabajo['estado'].upper()})"):
-                        col1, col2 = st.columns(2)
-                        
-                        with col1:
-                            st.write(f"**Fecha:** {trabajo['fecha_solicitada']}")
-                            st.write(f"**Hora:** {trabajo['hora_solicitada']}")
-                            st.write(f"**Dirección:** {trabajo['direccion']}")
-                        
-                        with col2:
-                            st.write(f"**Estado:** {trabajo['estado'].upper()}")
-                            if trabajo.get('precio_propuesto'):
-                                st.write(f"**Precio propuesto:** ${int(trabajo['precio_propuesto'])}")
-                            if trabajo.get('precio_final'):
-                                st.write(f"**Precio final:** ${int(trabajo['precio_final'])}")
-                        
-                        st.write(f"**Descripción:** {trabajo['descripcion']}")
-                        
-                        # Botones según estado
-                        if trabajo['estado'] == "completado":
-                            if st.button("⭐ Evaluar trabajo", key=f"evaluar_{trabajo['id']}"):
-                                st.session_state.ver_trabajo_id = trabajo['id']
-                                st.session_state.page = "evaluar_trabajo"
-                                rerun_safe()
-                        
-                        if trabajo['estado'] == "evaluado":
-                            st.success("✅ Ya evaluaste este trabajo")
-                        
-                        # Ver fotos si las hay
-                        fotos = db.get_fotos_trabajo(trabajo['id'])
-                        if fotos:
-                            st.write("**📸 Fotos del trabajo:**")
-                            cols_fotos = st.columns(min(len(fotos), 3))
-                            for idx, foto in enumerate(fotos[:3]):
-                                with cols_fotos[idx % 3]:
-                                    try:
-                                        import base64
-                                        st.image(base64.b64decode(foto['foto_base64']))
-                                        if foto.get('descripcion'):
-                                            st.caption(foto['descripcion'])
-                                    except Exception:
-                                        st.write("Error al cargar foto")
-            else:
-                st.info("No has solicitado ningún trabajo aún.")
-        
-        with tab2:
-            st.subheader("Trabajos recibidos")
-            trabajos_trabajador = db.get_trabajos_trabajador(current_user_id())
-            
-            if trabajos_trabajador:
-                for trabajo in trabajos_trabajador:
-                    estado_emoji = {
-                        "pendiente": "⏳",
-                        "aceptado": "✅",
-                        "rechazado": "❌",
-                        "completado": "🎉",
-                        "evaluado": "⭐",
-                        "cancelado": "🚫"
-                    }
-                    
-                    emoji = estado_emoji.get(trabajo['estado'], "📋")
-                    
-                    with st.expander(f"{emoji} {trabajo['servicio_nombre']} - Cliente: {trabajo['cliente_nombre']} ({trabajo['estado'].upper()})"):
-                        col1, col2 = st.columns(2)
-                        
-                        with col1:
-                            st.write(f"**Fecha:** {trabajo['fecha_solicitada']}")
-                            st.write(f"**Hora:** {trabajo['hora_solicitada']}")
-                            st.write(f"**Dirección:** {trabajo['direccion']}")
-                        
-                        with col2:
-                            st.write(f"**Estado:** {trabajo['estado'].upper()}")
-                            if trabajo.get('precio_propuesto'):
-                                st.write(f"**Precio propuesto:** ${int(trabajo['precio_propuesto'])}")
-                            if trabajo.get('precio_final'):
-                                st.write(f"**Precio final:** ${int(trabajo['precio_final'])}")
-                        
-                        st.write(f"**Descripción:** {trabajo['descripcion']}")
-                        
-                        # Acciones según estado
-                        if trabajo['estado'] == "pendiente":
-                            col_btn1, col_btn2 = st.columns(2)
-                            with col_btn1:
-                                if st.button("✅ Aceptar", key=f"aceptar_{trabajo['id']}", use_container_width=True):
-                                    db.update_trabajo_estado(trabajo['id'], "aceptado")
-                                    db.add_notification(
-                                        trabajo['cliente_id'],
-                                        "trabajo_aceptado",
-                                        f"{current_user_name()} aceptó tu solicitud de {trabajo['servicio_nombre']}"
-                                    )
-                                    st.success("Trabajo aceptado")
-                                    rerun_safe()
-                            
-                            with col_btn2:
-                                if st.button("❌ Rechazar", key=f"rechazar_{trabajo['id']}", use_container_width=True):
-                                    db.update_trabajo_estado(trabajo['id'], "rechazado")
-                                    db.add_notification(
-                                        trabajo['cliente_id'],
-                                        "trabajo_rechazado",
-                                        f"{current_user_name()} rechazó tu solicitud de {trabajo['servicio_nombre']}"
-                                    )
-                                    st.warning("Trabajo rechazado")
-                                    rerun_safe()
-                        
-                        elif trabajo['estado'] == "aceptado":
-                            if st.button("🎉 Marcar como completado", key=f"completar_{trabajo['id']}"):
-                                st.session_state.ver_trabajo_id = trabajo['id']
-                                st.session_state.page = "completar_trabajo"
-                                rerun_safe()
-                        
-                        elif trabajo['estado'] in ["completado", "evaluado"]:
-                            if trabajo.get('comentario_trabajador'):
-                                st.info(f"**Tu comentario:** {trabajo['comentario_trabajador']}")
-                            
-                            # Mostrar fotos
-                            fotos = db.get_fotos_trabajo(trabajo['id'])
-                            if fotos:
-                                st.write("**📸 Fotos subidas:**")
-                                cols_fotos = st.columns(min(len(fotos), 3))
-                                for idx, foto in enumerate(fotos):
-                                    with cols_fotos[idx % 3]:
-                                        try:
-                                            import base64
-                                            st.image(base64.b64decode(foto['foto_base64']))
-                                            if foto.get('descripcion'):
-                                                st.caption(foto['descripcion'])
-                                        except Exception:
-                                            st.write("Error al cargar foto")
-            else:
-                st.info("No has recibido solicitudes de trabajo aún.")
+        # Cambiar a completado
+        db.update_trabajo_estado(trabajo["id"], "completado")
+
+        # Notificar al cliente para evaluar
+        db.add_notification(
+            trabajo["cliente_id"],
+            "evaluacion_pendiente",
+            f"Tu trabajo con {trabajo['trabajador_nombre']} fue completado. ¡Evalúalo!"
+        )
+
+        st.success("Trabajo marcado como completado")
+        rerun_safe()
+
+elif trabajo['estado'] in ["completado", "evaluado"]:
+    if trabajo.get('comentario_trabajador'):
+        st.info(f"**Tu comentario:** {trabajo['comentario_trabajador']}")
+
+    # Mostrar fotos
+    fotos = db.get_fotos_trabajo(trabajo['id'])
+    if fotos:
+        st.write("**📸 Fotos subidas:**")
+        cols_fotos = st.columns(min(len(fotos), 3))
+        for idx, foto in enumerate(fotos):
+            with cols_fotos[idx % 3]:
+                try:
+                    import base64
+                    st.image(base64.b64decode(foto['foto_base64']))
+                    if foto.get('descripcion'):
+                        st.caption(foto['descripcion'])
+                except Exception:
+                    st.write("Error al cargar foto")
+
 # ---------- LOGIN / REGISTRO ----------
 elif st.session_state.get("page") in ["login", "registro"]:
     if st.session_state.get("page") == "login":
