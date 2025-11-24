@@ -584,6 +584,13 @@ elif st.session_state.get("page") == "perfil":
             st.write(f"**Email:** {user['email']}")
             st.write(f"**Comuna:** {user['comuna'] or '-'}")
             st.write(f"**Bio:** {user['bio'] or '-'}")
+prom = db.get_promedio_calificacion(user["id"])
+
+st.subheader("⭐ Valoraciones")
+if prom > 0:
+    st.write(f"Calificación promedio: {prom} / 5")
+else:
+    st.write("Aún no tiene evaluaciones.")
             
 # Mostrar calificación promedio del usuario (si es trabajador)
 prom = db.get_promedio_trabajador(user["id"])
@@ -877,6 +884,38 @@ elif st.session_state.get("page") == "evaluar_trabajo":
                     st.session_state.ver_trabajo_id = None
                     st.session_state.page = "mis_trabajos"
                     rerun_safe()
+# ---------- EVALUAR TRABAJO ----------
+elif st.session_state.get("page") == "evaluar_trabajo":
+
+    trabajo_id = st.session_state.get("ver_trabajo_id")
+    trabajo = db.get_trabajo_by_id(trabajo_id)
+
+    st.title("⭐ Evaluar Trabajo")
+
+    calificacion = st.slider("Calificación general", 1, 5, 4)
+    puntualidad = st.slider("Puntualidad", 1, 5, 4)
+    calidad = st.slider("Calidad del trabajo", 1, 5, 4)
+    comunicacion = st.slider("Comunicación", 1, 5, 4)
+    recomendaria = st.selectbox("¿Lo recomendarías?", [0, 1], format_func=lambda x: "Sí" if x else "No")
+
+    comentario = st.text_area("Comentario (opcional)")
+
+    if st.button("Enviar evaluación"):
+        db.create_evaluacion(
+            trabajo_id,
+            trabajo["cliente_id"],
+            trabajo["trabajador_id"],
+            calificacion,
+            comentario,
+            puntualidad,
+            calidad,
+            comunicacion,
+            recomendaria
+        )
+
+        st.success("¡Gracias por tu evaluación!")
+        st.session_state.page = "mis_trabajos"
+        rerun_safe()
 
 # ---------- LOGIN / REGISTRO ----------
 elif st.session_state.get("page") in ["login", "registro"]:
