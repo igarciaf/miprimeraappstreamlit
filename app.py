@@ -592,12 +592,12 @@ if prom > 0:
 else:
     st.write("Aún no tiene evaluaciones.")
             
-# Mostrar calificación promedio del usuario (si es trabajador)
-prom = db.get_promedio_trabajador(user["id"])
-if prom and prom.get("total", 0) > 0:
-    st.write(f"⭐ **Calificación promedio:** {prom['promedio']} / 5 ({prom['total']} evaluaciones)")
-else:
-    st.write("⭐ Sin evaluaciones todavía")
+# Mostrar valoraciones del trabajador
+            stats = db.get_estadisticas_trabajador(user["id"])
+            if stats['total_evaluaciones'] > 0:
+                st.write(f"⭐ **Calificación promedio:** {stats['promedio_general']} / 5 ({stats['total_evaluaciones']} evaluaciones)")
+            else:
+                st.write("⭐ Sin evaluaciones todavía")
 
             st.subheader("Tus publicaciones")
             user_services = db.get_user_services(current_user_id())
@@ -665,6 +665,137 @@ else:
                         db.update_user_profile(current_user_id(), nuevo_nombre, nueva_bio, nueva_comuna)
                         st.success("Perfil actualizado")
                         rerun_safe()
+
+# ---------- MIS TRABAJOS ----------
+elif st.session_state.get("page") == "mis_trabajos":
+    st.markdown('<h1 class="conecta-title">📋 Mis Trabajos</h1>', unsafe_allow_html=True)
+    
+    if not current_user_id():
+        st.warning("Debes iniciar sesión para ver tus trabajos.")
+    else:
+        tab1, tab2 = st.tabs(["📤 Solicitados por mí", "📥 Recibidos (como trabajador)"])
+        
+        with tab1:
+            st.subheader("Trabajos que has solicitado")
+            trabajos_cliente = db.get_trabajos_cliente(current_user_id())
+            
+            if trabajos_cliente:
+                for trabajo in trabajos_cliente:
+                    estado_emoji = {
+                        "pendiente": "⏳", "aceptado": "✅", "rechazado": "❌",
+                        "completado": "🎉", "evaluado": "⭐", "cancelado": "🚫"
+                    }
+                    emoji = estado_emoji.get(trabajo['estado'], "📋")
+                    
+                    with st.expander(f"{emoji} {trabajo['servicio_nombre']} - {trabajo['trabajador_nombre']} ({trabajo['estado'].upper()})"):
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.write(f"**Fecha:** {trabajo['fecha_solicitada']}")
+                            st.write(f"**Hora:** {trabajo['hora_solicitada']}")
+                            st.write(f"**Dirección:** {trabajo['direccion']}")
+                        with col2:
+                            st.write(f"**Estado:** {trabajo['estado'].upper()}")
+                            if trabajo.get('precio_propuesto'):
+                                st.write(f"**Precio propuesto:** ${int(trabajo['precio_propuesto'])}")
+                            if trabajo.get('precio_final'):
+                                st.write(f"**Precio final:** ${int(trabajo['precio_final'])}")
+                        st.write(f"**Descripción:** {trabajo['descripcion']}")
+                        
+                        if trabajo['estado'] == "completado":
+                            if st.button("⭐ Evaluar trabajo", key=f"evaluar_{trabajo['id']}"):
+                                st.session_state.ver_trabajo_id = trabajo['id']
+                                st.session_state.page = "evaluar_trabajo"
+                                rerun_safe()
+                        
+                        if trabajo['estado'] == "evaluado":
+                            st.success("✅ Ya evaluaste este trabajo")
+                        
+                        fotos = db.get_fotos_trabajo(trabajo['id'])
+                        if fotos:
+                            st.write("**📸 Fotos del trabajo:**")
+                            cols_fotos = st.columns(min(len(fotos), 3))
+                            for idx, foto in enumerate(fotos[:3]):
+                                with cols_fotos[idx % 3]:
+                                    try:
+                                        import base64
+                                        st.image(base64.b64decode(foto['foto_base64']))
+                                        if foto.get('descripcion'):
+                                            st.caption(foto['descripcion'])
+                                    except:
+                                        st.write("Error al cargar foto")
+            else:
+                st.info("No has solicitado ningún trabajo aún.")
+        
+        with tab2:
+            st.subheader("Trabajos recibidos")
+            trabajos_trabajador = db.get_trabajos_trabajador(current_user_id())
+            
+            if trabajos_trabajador:
+                for trabajo in trabajos_trabajador:
+                    estado_emoji = {
+                        "pendiente": "⏳", "aceptado": "✅", "rechazado": "❌",
+                        "completado": "🎉", "evaluado": "⭐", "cancelado": "🚫"
+                    }
+                    emoji = estado_emoji.get(trabajo['estado'], "📋")
+                    
+                    with st.expander(f"{emoji} {trabajo['servicio_nombre']} - Cliente: {trabajo['cliente_nombre']} ({trabajo['estado'].upper()})"):
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.write(f"**Fecha:** {trabajo['fecha_solicitada']}")
+                            st.write(f"**Hora:** {trabajo['hora_solicitada']}")
+                            st.write(f"**Dirección:** {trabajo['direccion']}")
+                        with col2:
+                            st.write(f"**Estado:** {trabajo['estado'].upper()}")
+                            if trabajo.get('precio_propuesto'):
+                                st.write(f"**Precio propuesto:** ${int(trabajo['precio_propuesto'])}")
+                            if trabajo.get('precio_final'):
+                                st.write(f"**Precio final:** ${int(trabajo['precio_final'])}")
+                        st.write(f"**Descripción:** {trabajo['descripcion']}")
+                        
+                        if trabajo['estado'] == "pendiente":
+                            col_btn1, col_btn2 = st.columns(2)
+                            with col_btn1:
+                                if st.button("✅ Aceptar", key=f"aceptar_{trabajo['id']}", use_container_width=True):
+                                    db.update_trabajo_estado(trabajo['id'], "aceptado")
+                                    db.add_notification(trabajo['cliente_id'], "trabajo_aceptado",
+                                        f"{current_user_name()} aceptó tu solicitud de {trabajo['servicio_nombre']}")
+                                    st.success("Trabajo aceptado")
+                                    rerun_safe()
+                            with col_btn2:
+                                if st.button("❌ Rechazar", key=f"rechazar_{trabajo['id']}", use_container_width=True):
+                                    db.update_trabajo_estado(trabajo['id'], "rechazado")
+                                    db.add_notification(trabajo['cliente_id'], "trabajo_rechazado",
+                                        f"{current_user_name()} rechazó tu solicitud de {trabajo['servicio_nombre']}")
+                                    st.warning("Trabajo rechazado")
+                                    rerun_safe()
+                        
+                        elif trabajo['estado'] == "aceptado":
+                            if st.button("🎉 Marcar como completado", key=f"completar_{trabajo['id']}"):
+                                db.update_trabajo_estado(trabajo['id'], "completado")
+                                db.add_notification(trabajo['cliente_id'], "trabajo_completado",
+                                    f"Tu trabajo con {current_user_name()} fue completado. ¡Evalúalo!")
+                                st.success("Trabajo marcado como completado")
+                                rerun_safe()
+                        
+                        elif trabajo['estado'] in ["completado", "evaluado"]:
+                            if trabajo.get('comentario_trabajador'):
+                                st.info(f"**Tu comentario:** {trabajo['comentario_trabajador']}")
+                            fotos = db.get_fotos_trabajo(trabajo['id'])
+                            if fotos:
+                                st.write("**📸 Fotos subidas:**")
+                                cols_fotos = st.columns(min(len(fotos), 3))
+                                for idx, foto in enumerate(fotos):
+                                    with cols_fotos[idx % 3]:
+                                        try:
+                                            import base64
+                                            st.image(base64.b64decode(foto['foto_base64']))
+                                            if foto.get('descripcion'):
+                                                st.caption(foto['descripcion'])
+                                        except:
+                                            st.write("Error al cargar foto")
+            else:
+                st.info("No has recibido solicitudes de trabajo aún.")
+                
 # ---------- SOLICITAR SERVICIO ----------
 elif st.session_state.get("page") == "solicitar_servicio":
     st.markdown('<h1 class="conecta-title">✅ Solicitar Servicio</h1>', unsafe_allow_html=True)
@@ -783,139 +914,40 @@ elif st.session_state.get("page") == "solicitar_servicio":
                 if st.button("⬅️ Volver"):
                     st.session_state.page = "resultados"
                     rerun_safe()
-# ---------- MIS TRABAJOS ----------
-elif trabajo['estado'] == "aceptado":
-    col_btn1, col_btn2 = st.columns(2)
-    with col_btn1:
-        if st.button("🎉 Marcar como completado", key=f"completar_{trabajo['id']}", use_container_width=True):
-            # Cambiar estado a completado
-            db.update_trabajo_estado(trabajo["id"], "completado")
 
-            # Notificar al cliente para que evalúe
-            db.add_notification(
-                trabajo["cliente_id"],
-                "evaluacion_pendiente",
-                f"Tu trabajo con {trabajo['trabajador_nombre']} fue completado. ¡Evalúalo!"
-            )
-
-            st.success("Trabajo marcado como completado")
-            rerun_safe()
-    with col_btn2:
-        if st.button("❌ Cancelar / Marcar otro estado", key=f"cancelar_{trabajo['id']}", use_container_width=True):
-            # Opcional: permitir marcar otro estado (ej: rechazado/cancelado)
-            db.update_trabajo_estado(trabajo["id"], "cancelado")
-            db.add_notification(
-                trabajo["cliente_id"],
-                "trabajo_cancelado",
-                f"{current_user_name()} canceló el trabajo {trabajo['servicio_nombre']}"
-            )
-            st.warning("Trabajo marcado como cancelado")
-            rerun_safe()
-
-
-elif trabajo['estado'] in ["completado", "evaluado"]:
-    if trabajo.get('comentario_trabajador'):
-        st.info(f"**Tu comentario:** {trabajo['comentario_trabajador']}")
-
-    # Mostrar fotos
-    fotos = db.get_fotos_trabajo(trabajo['id'])
-    if fotos:
-        st.write("**📸 Fotos subidas:**")
-        cols_fotos = st.columns(min(len(fotos), 3))
-        for idx, foto in enumerate(fotos):
-            with cols_fotos[idx % 3]:
-                try:
-                    import base64
-                    st.image(base64.b64decode(foto['foto_base64']))
-                    if foto.get('descripcion'):
-                        st.caption(foto['descripcion'])
-                except Exception:
-                    st.write("Error al cargar foto")
 # ---------- EVALUAR TRABAJO ----------
 elif st.session_state.get("page") == "evaluar_trabajo":
-    trabajo_id = st.session_state.get("eval_trabajo_id") or st.session_state.get("ver_trabajo_id")
+    trabajo_id = st.session_state.get("ver_trabajo_id")
     if not trabajo_id:
         st.error("No se encontró el trabajo para evaluar.")
     else:
         trabajo = db.get_trabajo_by_id(trabajo_id)
-        if not trabajo:
-            st.error("Trabajo no encontrado.")
+        if not trabajo or trabajo['cliente_id'] != current_user_id():
+            st.warning("Solo el cliente puede evaluar el trabajo.")
         else:
-            # Solo el cliente (quien solicitó) puede evaluar
-            if trabajo['cliente_id'] != current_user_id():
-                st.warning("Sólo el cliente que solicitó el trabajo puede evaluarlo.")
-            else:
-                st.markdown('<h1 class="conecta-title">⭐ Evaluar Trabajo</h1>', unsafe_allow_html=True)
-                st.write(f"**Servicio:** {trabajo['servicio_nombre']}")
-                st.write(f"**Trabajador:** {trabajo['trabajador_nombre']}")
-                st.markdown("---")
+            st.markdown('<h1 class="conecta-title">⭐ Evaluar Trabajo</h1>', unsafe_allow_html=True)
+            st.write(f"**Servicio:** {trabajo['servicio_nombre']}")
+            st.write(f"**Trabajador:** {trabajo['trabajador_nombre']}")
+            st.markdown("---")
 
-                calificacion = st.slider("Calificación general", 1, 5, 5, key="eval_calificacion")
-                puntualidad = st.slider("Puntualidad", 1, 5, 5, key="eval_puntualidad")
-                calidad = st.slider("Calidad del trabajo", 1, 5, 5, key="eval_calidad")
-                comunicacion = st.slider("Comunicación", 1, 5, 5, key="eval_comunicacion")
-                recomendaria = st.selectbox("¿Lo recomendarías?", [1, 0], format_func=lambda x: "Sí" if x == 1 else "No", key="eval_recomendaria")
-                comentario = st.text_area("Comentario (opcional)", key="eval_comentario", height=120)
+            calificacion = st.slider("Calificación general", 1, 5, 5, key="eval_calificacion")
+            puntualidad = st.slider("Puntualidad", 1, 5, 5, key="eval_puntualidad")
+            calidad = st.slider("Calidad del trabajo", 1, 5, 5, key="eval_calidad")
+            comunicacion = st.slider("Comunicación", 1, 5, 5, key="eval_comunicacion")
+            recomendaria = st.selectbox("¿Lo recomendarías?", [1, 0], 
+                format_func=lambda x: "Sí" if x == 1 else "No", key="eval_recomendaria")
+            comentario = st.text_area("Comentario (opcional)", key="eval_comentario", height=120)
 
-                if st.button("Enviar evaluación", key="enviar_eval"):
-                    # Guardar evaluación en la base de datos
-                    db.create_evaluacion(
-                        trabajo_id,
-                        trabajo["cliente_id"],
-                        trabajo["trabajador_id"],
-                        int(calificacion),
-                        comentario or "",
-                        int(puntualidad),
-                        int(calidad),
-                        int(comunicacion),
-                        int(recomendaria)
-                    )
-
-                    # Notificar al trabajador que recibió una evaluación (opcional)
-                    db.add_notification(
-                        trabajo["trabajador_id"],
-                        "evaluacion_recibida",
-                        f"Has recibido una nueva evaluación de {current_user_name()} para {trabajo['servicio_nombre']}"
-                    )
-
-                    st.success("¡Gracias! Tu evaluación fue enviada.")
-                    # limpiar state
-                    st.session_state.eval_trabajo_id = None
-                    st.session_state.ver_trabajo_id = None
-                    st.session_state.page = "mis_trabajos"
-                    rerun_safe()
-# ---------- EVALUAR TRABAJO ----------
-elif st.session_state.get("page") == "evaluar_trabajo":
-
-    trabajo_id = st.session_state.get("ver_trabajo_id")
-    trabajo = db.get_trabajo_by_id(trabajo_id)
-
-    st.title("⭐ Evaluar Trabajo")
-
-    calificacion = st.slider("Calificación general", 1, 5, 4)
-    puntualidad = st.slider("Puntualidad", 1, 5, 4)
-    calidad = st.slider("Calidad del trabajo", 1, 5, 4)
-    comunicacion = st.slider("Comunicación", 1, 5, 4)
-    recomendaria = st.selectbox("¿Lo recomendarías?", [0, 1], format_func=lambda x: "Sí" if x else "No")
-
-    comentario = st.text_area("Comentario (opcional)")
-
-    if st.button("Enviar evaluación"):
-        db.create_evaluacion(
-            trabajo_id,
-            trabajo["cliente_id"],
-            trabajo["trabajador_id"],
-            calificacion,
-            comentario,
-            puntualidad,
-            calidad,
-            comunicacion,
-            recomendaria
-        )
-
-        st.success("¡Gracias por tu evaluación!")
-        st.session_state.page = "mis_trabajos"
-        rerun_safe()
+            if st.button("Enviar evaluación", key="enviar_eval"):
+                db.create_evaluacion(trabajo_id, trabajo["cliente_id"], trabajo["trabajador_id"],
+                    int(calificacion), comentario or "", int(puntualidad), int(calidad), 
+                    int(comunicacion), int(recomendaria))
+                db.add_notification(trabajo["trabajador_id"], "evaluacion_recibida",
+                    f"Has recibido una nueva evaluación de {current_user_name()}")
+                st.success("¡Gracias! Tu evaluación fue enviada.")
+                st.session_state.ver_trabajo_id = None
+                st.session_state.page = "mis_trabajos"
+                rerun_safe()
 
 # ---------- LOGIN / REGISTRO ----------
 elif st.session_state.get("page") in ["login", "registro"]:
