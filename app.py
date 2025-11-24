@@ -593,7 +593,7 @@ elif st.session_state.get("page") == "perfil":
             st.markdown("---")
             st.subheader("⭐ Valoraciones")
 
-            # ---- Promedio general (si tienes esta función) ----
+            # ---- Promedio general----
             try:
                 prom = db.get_promedio_calificacion(user["id"])
                 if prom and prom > 0:
@@ -603,7 +603,7 @@ elif st.session_state.get("page") == "perfil":
             except:
                 pass
 
-            # ---- Estadísticas detalladas (tu nueva función) ----
+            # ---- Estadísticas detalladas----
             try:
                 stats = db.get_estadisticas_trabajador(user["id"])
                 if stats and stats.get('total_evaluaciones', 0) > 0:
