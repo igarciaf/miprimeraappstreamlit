@@ -593,7 +593,7 @@ else:
     st.write("Aún no tiene evaluaciones.")
             
 # Mostrar valoraciones del trabajador
-            stats = db.get_estadisticas_trabajador(user["id"])
+               stats = db.get_estadisticas_trabajador(user["id"])
             if stats['total_evaluaciones'] > 0:
                 st.write(f"⭐ **Calificación promedio:** {stats['promedio_general']} / 5 ({stats['total_evaluaciones']} evaluaciones)")
             else:
