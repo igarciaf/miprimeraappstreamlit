@@ -612,6 +612,25 @@ elif st.session_state.get("page") == "perfil":
                     st.write("⭐ Sin evaluaciones todavía")
             except:
                 pass
+# ---- Reseñas escritas por clientes ----
+st.markdown("### 📝 Reseñas de clientes")
+
+evaluaciones = db.get_evaluaciones_trabajador(user["id"])
+
+if not evaluaciones:
+    st.write("Aún no tiene reseñas.")
+else:
+    for ev in evaluaciones:
+        st.markdown(f"""
+        **Cliente:** {ev['cliente_nombre']}  
+        **Calificación:** ⭐ {ev['calificacion']} / 5  
+        **Puntualidad:** {ev['puntualidad']}  
+        **Calidad:** {ev['calidad']}  
+        **Comunicación:** {ev['comunicacion']}  
+        **¿Recomendaría?:** {"Sí" if ev['recomendaria'] == 1 else "No"}  
+        **Comentario:** {ev['comentario'] or "Sin comentario"}  
+        ---
+        """)
 
             st.markdown("---")
             st.subheader("Tus publicaciones")
