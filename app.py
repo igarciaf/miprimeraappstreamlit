@@ -656,15 +656,16 @@ st.markdown("---")
 st.subheader("Tus publicaciones")
 
             # ---- Servicios publicados ----
-            user_services = db.get_user_services(current_user_id())
+user_services = db.get_user_services(current_user_id())
 
-            if user_services:
-                for s in user_services:
-                    st.write(
-                        f"- {s['service']} ({s['category']}) — "
-                        f"{s.get('comuna') or 'Sin comuna'} — "
-                        f"Precio: {('$'+str(s['price'])) if s.get('price') else 'No informado'}"
-                    )
+if user_services:
+    for s in user_services:
+        st.write(
+            f"- {s['service']} ({s['category']}) — "
+            f"{s.get('comuna') or 'Sin comuna'} — "
+            f"Precio: {('$'+str(s['price'])) if s.get('price') else 'No informado'}"
+        )
+                    
             else:
                 st.write("Aún no has publicado servicios.")
 
