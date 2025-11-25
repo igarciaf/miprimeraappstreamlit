@@ -666,29 +666,26 @@ if user_services:
             f"Precio: {('$'+str(s['price'])) if s.get('price') else 'No informado'}"
         )
                     
-            else:
-                st.write("Aún no has publicado servicios.")
+else:
+    st.write("Aún no has publicado servicios.")
 
-            st.markdown("---")
-            st.write("### Publicar un servicio")
+st.markdown("---")
+st.write("### Publicar un servicio")
 
             # ---- Seleccionar categoría ----
             cat = st.selectbox("Categoría", [""] + list(opciones_map.keys()), key="pub_cat_select")
 
-            if cat:
-                st.session_state.publish_cat = cat
-                sublista = opciones_map.get(cat, [])
+if cat:
+    st.session_state.publish_cat = cat
+    sublista = opciones_map.get(cat, [])
 
-                if sublista:
-                    cols_per_row = 3
-                    for i in range(0, len(sublista), cols_per_row):
-                        cols = st.columns(cols_per_row)
-                        for idx, opt in enumerate(sublista[i:i + cols_per_row]):
-                            with cols[idx]:
-                                if st.button(opt, key=f"pub_opt_{i+idx}"):
-                                    st.session_state.publish_service = opt
-                                    rerun_safe()
-
+    if sublista:
+        cols_per_row = 3
+        for i in range(0, len(sublista), cols_per_row):
+            cols = st.columns(cols_per_row)
+            for idx, opt in enumerate(sublista[i:i + cols_per_row]):
+                with cols[idx]:
+                    if st.button(opt,
                 # ---- Formulario publicación ----
                 if st.session_state.publish_service:
                     st.write(f"Has seleccionado: **{st.session_state.publish_service}**")
