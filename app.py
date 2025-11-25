@@ -673,7 +673,7 @@ st.markdown("---")
 st.write("### Publicar un servicio")
 
             # ---- Seleccionar categoría ----
-            cat = st.selectbox("Categoría", [""] + list(opciones_map.keys()), key="pub_cat_select")
+cat = st.selectbox("Categoría", [""] + list(opciones_map.keys()), key="pub_cat_select")
 
 if cat:
     st.session_state.publish_cat = cat
