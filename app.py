@@ -672,7 +672,7 @@ else:
 st.markdown("---")
 st.write("### Publicar un servicio")
 
-            # ---- Seleccionar categoría ----
+# ---- Seleccionar categoría ----
 cat = st.selectbox("Categoría", [""] + list(opciones_map.keys()), key="pub_cat_select")
 
 if cat:
@@ -685,10 +685,14 @@ if cat:
             cols = st.columns(cols_per_row)
             for idx, opt in enumerate(sublista[i:i + cols_per_row]):
                 with cols[idx]:
-                    if st.button(opt,
-                # ---- Formulario publicación ----
-                if st.session_state.publish_service:
-                    st.write(f"Has seleccionado: **{st.session_state.publish_service}**")
+                    if st.button(opt, key=f"pub_opt_{opt}"):
+                        st.session_state.publish_service = opt
+                        rerun_safe()
+
+    # ---- Formulario publicación ----
+    if st.session_state.get("publish_service"):
+        st.write(f"Has seleccionado: **{st.session_state.publish_service}**")
+
 
                     with st.form("publish_service_form"):
                         comuna_sel = st.selectbox(
