@@ -693,41 +693,41 @@ if cat:
     if st.session_state.get("publish_service"):
         st.write(f"Has seleccionado: **{st.session_state.publish_service}**")
 
+        with st.form("publish_service_form"):
+            comuna_sel = st.selectbox(
+                "Comuna donde ofreces (opcional)",
+                [""] + comunas_santiago,
+                key="pub_comuna_select"
+            )
+            price_input = st.text_input("Precio (opcional)", key="pub_price_input")
 
-                    with st.form("publish_service_form"):
-                        comuna_sel = st.selectbox(
-                            "Comuna donde ofreces (opcional)",
-                            [""] + comunas_santiago,
-                            key="pub_comuna_select"
-                        )
-                        price_input = st.text_input("Precio (opcional)", key="pub_price_input")
+            if st.form_submit_button("Publicar servicio"):
+                service_name = st.session_state.publish_service
+                category_name = st.session_state.publish_cat or cat
+                comuna_val = comuna_sel if comuna_sel else None
 
-                        if st.form_submit_button("Publicar servicio"):
-                            service_name = st.session_state.publish_service
-                            category_name = st.session_state.publish_cat or cat
-                            comuna_val = comuna_sel if comuna_sel else None
+                try:
+                    price_val = float(price_input) if price_input.strip() else None
+                except:
+                    st.warning("Precio inválido; usa sólo números.")
+                    price_val = None
 
-                            try:
-                                price_val = float(price_input) if price_input.strip() else None
-                            except:
-                                st.warning("Precio inválido; usa sólo números.")
-                                price_val = None
+                sid = db.add_service(
+                    current_user_id(),
+                    category_name,
+                    service_name,
+                    comuna_val,
+                    price_val
+                )
 
-                            sid = db.add_service(
-                                current_user_id(),
-                                category_name,
-                                service_name,
-                                comuna_val,
-                                price_val
-                            )
+                if sid:
+                    st.success("Servicio publicado correctamente")
+                    st.session_state.publish_cat = None
+                    st.session_state.publish_service = None
+                    rerun_safe()
+                else:
+                    st.error("No se pudo publicar el servicio.")
 
-                            if sid:
-                                st.success("Servicio publicado correctamente")
-                                st.session_state.publish_cat = None
-                                st.session_state.publish_service = None
-                                rerun_safe()
-                            else:
-                                st.error("No se pudo publicar el servicio.")
             st.markdown("---")
             if st.button("Editar perfil", key="editar_perfil_btn"):
                 with st.form("edit_profile_form"):
