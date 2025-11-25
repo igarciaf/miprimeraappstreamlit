@@ -652,8 +652,8 @@ else:
         ---
         """)
 
-            st.markdown("---")
-            st.subheader("Tus publicaciones")
+st.markdown("---")
+st.subheader("Tus publicaciones")
 
             # ---- Servicios publicados ----
             user_services = db.get_user_services(current_user_id())
