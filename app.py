@@ -593,17 +593,17 @@ elif st.session_state.get("page") == "perfil":
             st.markdown("---")
             st.subheader("⭐ Valoraciones")
 
-            # ---- Promedio general----
+            # ---- Promedio general ----
             try:
                 prom = db.get_promedio_calificacion(user["id"])
                 if prom and prom > 0:
-                    st.write(f"Calificación promedio general: {prom} / 5")
+                    st.write(f"**Calificación promedio general:** {prom} / 5")
                 else:
                     st.write("Aún no tiene evaluaciones.")
             except:
-                pass
+                st.write("Error al obtener promedio.")
 
-            # ---- Estadísticas detalladas----
+            # ---- Estadísticas detalladas ----
             try:
                 stats = db.get_estadisticas_trabajador(user["id"])
                 if stats and stats.get('total_evaluaciones', 0) > 0:
@@ -611,9 +611,10 @@ elif st.session_state.get("page") == "perfil":
                 else:
                     st.write("⭐ Sin evaluaciones todavía")
             except:
-                pass
-                
-            # ---- Reseñas de clientes ----
+                st.write("Error al obtener estadísticas.")
+
+            # ---- Reseñas ----
+            st.markdown("---")
             st.markdown("### 📝 Reseñas de clientes")
 
             evaluaciones = db.get_evaluaciones_trabajador(user["id"])
@@ -633,79 +634,82 @@ elif st.session_state.get("page") == "perfil":
                     ---
                     """)
 
-            
-            # ---- Servicios publicados ----
-user_services = db.get_user_services(current_user_id())
+            # ---- Publicaciones ----
+            st.markdown("---")
+            st.subheader("Tus publicaciones")
 
-if user_services:
-    for s in user_services:
-        st.write(
-            f"- {s['service']} ({s['category']}) — "
-            f"{s.get('comuna') or 'Sin comuna'} — "
-            f"Precio: {('$'+str(s['price'])) if s.get('price') else 'No informado'}"
-        )
-                    
-else:
-    st.write("Aún no has publicado servicios.")
+            user_services = db.get_user_services(current_user_id())
 
-st.markdown("---")
-st.write("### Publicar un servicio")
+            if user_services:
+                for s in user_services:
+                    st.write(
+                        f"- {s['service']} ({s['category']}) — "
+                        f"{s.get('comuna') or 'Sin comuna'} — "
+                        f"Precio: {('$'+str(s['price'])) if s.get('price') else 'No informado'}"
+                    )
+            else:
+                st.write("Aún no has publicado servicios.")
 
-# ---- Seleccionar categoría ----
-cat = st.selectbox("Categoría", [""] + list(opciones_map.keys()), key="pub_cat_select")
+            # ---- Publicar un servicio ----
+            st.markdown("---")
+            st.write("### Publicar un servicio")
 
-if cat:
-    st.session_state.publish_cat = cat
-    sublista = opciones_map.get(cat, [])
+            cat = st.selectbox("Categoría", [""] + list(opciones_map.keys()), key="pub_cat_select")
 
-    if sublista:
-        cols_per_row = 3
-        for i in range(0, len(sublista), cols_per_row):
-            cols = st.columns(cols_per_row)
-            for idx, opt in enumerate(sublista[i:i + cols_per_row]):
-                with cols[idx]:
-                    if st.button(opt, key=f"pub_opt_{opt}"):
-                        st.session_state.publish_service = opt
-                        rerun_safe()
+            if cat:
+                st.session_state.publish_cat = cat
+                sublista = opciones_map.get(cat, [])
 
-    # ---- Formulario publicación ----
-    if st.session_state.get("publish_service"):
-        st.write(f"Has seleccionado: **{st.session_state.publish_service}**")
+                if sublista:
+                    cols_per_row = 3
+                    for i in range(0, len(sublista), cols_per_row):
+                        cols = st.columns(cols_per_row)
+                        for idx, opt in enumerate(sublista[i:i + cols_per_row]):
+                            with cols[idx]:
+                                if st.button(opt, key=f"pub_opt_{i+idx}"):
+                                    st.session_state.publish_service = opt
+                                    rerun_safe()
 
-        with st.form("publish_service_form"):
-            comuna_sel = st.selectbox(
-                "Comuna donde ofreces (opcional)",
-                [""] + comunas_santiago,
-                key="pub_comuna_select"
-            )
-            price_input = st.text_input("Precio (opcional)", key="pub_price_input")
+            # ---- Formulario de publicación ----
+            if st.session_state.get("publish_service"):
+                st.write(f"Has seleccionado: **{st.session_state.publish_service}**")
 
-            if st.form_submit_button("Publicar servicio"):
-                service_name = st.session_state.publish_service
-                category_name = st.session_state.publish_cat or cat
-                comuna_val = comuna_sel if comuna_sel else None
+                with st.form("publish_service_form"):
+                    comuna_sel = st.selectbox(
+                        "Comuna donde ofreces (opcional)",
+                        [""] + comunas_santiago,
+                        key="pub_comuna_select"
+                    )
 
-                try:
-                    price_val = float(price_input) if price_input.strip() else None
-                except:
-                    st.warning("Precio inválido; usa sólo números.")
-                    price_val = None
+                    price_input = st.text_input("Precio (opcional)", key="pub_price_input")
 
-                sid = db.add_service(
-                    current_user_id(),
-                    category_name,
-                    service_name,
-                    comuna_val,
-                    price_val
-                )
+                    if st.form_submit_button("Publicar servicio"):
+                        service_name = st.session_state.publish_service
+                        category_name = st.session_state.publish_cat or cat
+                        comuna_val = comuna_sel if comuna_sel else None
 
-                if sid:
-                    st.success("Servicio publicado correctamente")
-                    st.session_state.publish_cat = None
-                    st.session_state.publish_service = None
-                    rerun_safe()
-                else:
-                    st.error("No se pudo publicar el servicio.")
+                        try:
+                            price_val = float(price_input) if price_input.strip() else None
+                        except:
+                            st.warning("Precio inválido; usa sólo números.")
+                            price_val = None
+
+                        sid = db.add_service(
+                            current_user_id(),
+                            category_name,
+                            service_name,
+                            comuna_val,
+                            price_val
+                        )
+
+                        if sid:
+                            st.success("Servicio publicado correctamente")
+                            st.session_state.publish_cat = None
+                            st.session_state.publish_service = None
+                            rerun_safe()
+                        else:
+                            st.error("No se pudo publicar el servicio.")
+
 
             st.markdown("---")
             if st.button("Editar perfil", key="editar_perfil_btn"):
