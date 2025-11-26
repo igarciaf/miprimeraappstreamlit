@@ -482,6 +482,7 @@ def get_evaluaciones_trabajador(trabajador_id: int) -> List[Dict]:
     conn.close()
     return [dict(r) for r in rows]
 
+
 def get_promedio_calificacion(trabajador_id: int) -> float:
     conn = get_conn()
     cur = conn.cursor()
@@ -566,18 +567,3 @@ def get_fotos_trabajador(trabajador_id: int, limit: int = 10) -> List[Dict]:
     rows = cur.fetchall()
     conn.close()
     return [dict(r) for r in rows]
-
-def get_evaluaciones_trabajador(user_id):
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute("""
-        SELECT e.*, u.nombre AS cliente_nombre
-        FROM evaluaciones e
-        JOIN users u ON e.cliente_id = u.id
-        WHERE e.trabajador_id = ?
-        ORDER BY e.fecha DESC
-    """, (user_id,))
-    rows = cur.fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
-
