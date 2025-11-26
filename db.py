@@ -464,23 +464,48 @@ def create_evaluacion(trabajo_id: int, cliente_id: int, trabajador_id: int,
     return eval_id
 
 def get_evaluaciones_trabajador(trabajador_id: int) -> List[Dict]:
+    """Obtener todas las evaluaciones de un trabajador"""
+    if not trabajador_id:
+        return []
+    
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute("""
-        SELECT e.*, c.nombre as cliente_nombre, t.servicio_nombre
-        FROM evaluaciones e
-        JOIN users c ON e.cliente_id = c.id
-        JOIN (
-            SELECT tr.id, s.service as servicio_nombre
-            FROM trabajos tr
-            JOIN services s ON tr.service_id = s.id
-        ) t ON e.trabajo_id = t.id
-        WHERE e.trabajador_id = ?
-        ORDER BY e.fecha DESC
-    """, (trabajador_id,))
-    rows = cur.fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
+    
+    try:
+        # Consulta simplificada y más robusta
+        cur.execute("""
+            SELECT 
+                e.id,
+                e.trabajo_id,
+                e.cliente_id,
+                e.trabajador_id,
+                e.calificacion,
+                e.comentario,
+                e.puntualidad,
+                e.calidad,
+                e.comunicacion,
+                e.recomendaria,
+                e.fecha,
+                c.nombre as cliente_nombre,
+                s.service as servicio_nombre
+            FROM evaluaciones e
+            INNER JOIN users c ON e.cliente_id = c.id
+            INNER JOIN trabajos tr ON e.trabajo_id = tr.id
+            INNER JOIN services s ON tr.service_id = s.id
+            WHERE e.trabajador_id = ?
+            ORDER BY e.fecha DESC
+        """, (trabajador_id,))
+        
+        rows = cur.fetchall()
+        result = [dict(r) for r in rows]
+        
+    except Exception as e:
+        print(f"Error en get_evaluaciones_trabajador: {e}")
+        result = []
+    finally:
+        conn.close()
+    
+    return result
 
 
 def get_promedio_calificacion(trabajador_id: int) -> float:
