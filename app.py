@@ -593,46 +593,66 @@ elif st.session_state.get("page") == "perfil":
             st.markdown("---")
             st.subheader("⭐ Valoraciones")
 
-            # ---- Promedio general ----
+# ---- Promedio general ----
+            st.markdown("---")
+            st.subheader("⭐ Valoraciones")
+            
             try:
                 prom = db.get_promedio_calificacion(user["id"])
                 if prom and prom > 0:
-                    st.write(f"**Calificación promedio general:** {prom} / 5")
+                    st.metric("Calificación promedio", f"{prom} / 5", "⭐")
                 else:
-                    st.write("Aún no tiene evaluaciones.")
-            except:
-                st.write("Error al obtener promedio.")
+                    st.info("Aún no tiene evaluaciones.")
+            except Exception as e:
+                st.warning("No se pudo cargar el promedio de calificaciones.")
 
             # ---- Estadísticas detalladas ----
             try:
                 stats = db.get_estadisticas_trabajador(user["id"])
                 if stats and stats.get('total_evaluaciones', 0) > 0:
-                    st.write(f"⭐ **Promedio del trabajador:** {round(stats['promedio_general'],1)} / 5 ({stats['total_evaluaciones']} evaluaciones)")
-                else:
-                    st.write("⭐ Sin evaluaciones todavía")
-            except:
-                st.write("Error al obtener estadísticas.")
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("Trabajos completados", stats['trabajos_completados'])
+                    with col2:
+                        st.metric("Evaluaciones", stats['total_evaluaciones'])
+                    with col3:
+                        st.metric("Recomendaciones", stats['recomendaciones'])
+            except Exception as e:
+                st.warning("No se pudieron cargar las estadísticas.")
 
-            # ---- Reseñas ----
+# ---- Reseñas ----
             st.markdown("---")
             st.markdown("### 📝 Reseñas de clientes")
 
-            evaluaciones = db.get_evaluaciones_trabajador(user["id"])
-
-            if not evaluaciones:
-                st.write("Aún no tiene reseñas.")
-            else:
-                for ev in evaluaciones:
-                    st.markdown(f"""
-                    **Cliente:** {ev['cliente_nombre']}  
-                    **Calificación:** ⭐ {ev['calificacion']} / 5  
-                    **Puntualidad:** {ev['puntualidad']}  
-                    **Calidad:** {ev['calidad']}  
-                    **Comunicación:** {ev['comunicacion']}  
-                    **¿Recomendaría?:** {"Sí" if ev['recomendaria'] == 1 else "No"}  
-                    **Comentario:** {ev['comentario'] or "Sin comentario"}  
-                    ---
-                    """)
+            try:
+                evaluaciones = db.get_evaluaciones_trabajador(user["id"])
+                
+                if not evaluaciones or len(evaluaciones) == 0:
+                    st.write("Aún no tiene reseñas.")
+                else:
+                    for ev in evaluaciones:
+                        with st.expander(f"⭐ {ev.get('calificacion', 0)}/5 - {ev.get('cliente_nombre', 'Anónimo')} ({ev.get('fecha', '')[:10]})"):
+                            col1, col2 = st.columns(2)
+                            
+                            with col1:
+                                st.write(f"**Calificación general:** ⭐ {ev.get('calificacion', 0)} / 5")
+                                st.write(f"**Puntualidad:** {ev.get('puntualidad', 0)} / 5")
+                                st.write(f"**Calidad:** {ev.get('calidad', 0)} / 5")
+                            
+                            with col2:
+                                st.write(f"**Comunicación:** {ev.get('comunicacion', 0)} / 5")
+                                st.write(f"**¿Recomendaría?:** {'✅ Sí' if ev.get('recomendaria') == 1 else '❌ No'}")
+                            
+                            if ev.get('comentario'):
+                                st.write(f"**Comentario:** {ev['comentario']}")
+                            else:
+                                st.write("**Comentario:** _Sin comentario_")
+                            
+                            st.caption(f"Servicio: {ev.get('servicio_nombre', 'N/A')}")
+            
+            except Exception as e:
+                st.error(f"Error al cargar las reseñas: {str(e)}")
+                st.write("No se pudieron cargar las reseñas en este momento.")
 
             # ---- Publicaciones ----
             st.markdown("---")
