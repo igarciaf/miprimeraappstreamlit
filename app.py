@@ -1053,9 +1053,7 @@ elif st.session_state.get("page") == "mis_trabajos":
                             db.update_trabajo_estado(trabajo['id'], "completado")
                             db.add_notification(trabajo['cliente_id'], "trabajo_completado",
                                 "Tu trabajo fue completado, ya puedes evaluarlo.")
-                            rerun_safe()
-
-                
+                            rerun_safe()                
 # ---------- SOLICITAR SERVICIO ----------
 elif st.session_state.get("page") == "solicitar_servicio":
 
@@ -1175,8 +1173,6 @@ elif st.session_state.get("page") == "solicitar_servicio":
                         st.session_state.solicitar_trabajador_id = None
                         st.session_state.page = "resultados"
                         rerun_safe()
-
-
 # ---------- EVALUAR TRABAJO ----------
 elif st.session_state.get("page") == "evaluar_trabajo"):
 
@@ -1239,8 +1235,6 @@ elif st.session_state.get("page") == "evaluar_trabajo"):
                 st.session_state.ver_trabajo_id = None
                 st.session_state.page = "mis_trabajos"
                 rerun_safe()
-
-
 # ---------- LOGIN / REGISTRO ----------
 elif st.session_state.get("page") in ["login", "registro"]:
     if st.session_state.get("page") == "login":
