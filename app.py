@@ -1,79 +1,116 @@
-# app.py
+# app.py — Archivo principal de la aplicación Streamlit
+
+# Importamos Streamlit, que es la librería que permite crear la interfaz web
 import streamlit as st
+# Importamos nuestros archivos internos:
+# - db: manejo de base de datos SQLite
+# - auth: sistema de registro e inicio de sesión
 import db
 import auth
+# Importamos datetime para trabajar con fechas y horas
 from datetime import datetime
-
-# Inicializar DB (asegura tablas)
+# Inicializa la base de datos: crea las tablas si no existen
 db.init_db()
-
+# Configuración inicial de la página de Streamlit:
+# - Título de la ventana
+# - Icono
+# - Diseño ancho para que todo se vea más cómodo
 st.set_page_config(page_title="Conecta", page_icon="🤝", layout="wide")
-
 
 # -------------------------
 # Helpers / rerun
 # -------------------------
+
 def rerun_safe():
-    """Reejecución segura."""
+    """Vuelve a ejecutar la app completa de forma segura.
+    Se usa después de cambiar valores en session_state para actualizar la pantalla."""
     st.rerun()
 
 
 def current_user_id():
-    """Devuelve id del usuario actualmente en sesión (si existe)."""
+    """Obtiene el ID del usuario actualmente logueado.
+    
+    Busca primero en session_state["user_id"].
+    Si no está, revisa session_state["user"] (que es un dict con info del usuario).
+    Si tampoco existe, devuelve None.
+    """
     uid = st.session_state.get("user_id")
-    if uid:
+    if uid:  # Si se guardó directamente el user_id, lo devuelve
         return uid
+    
     u = st.session_state.get("user")
+    # Si hay un diccionario con datos del usuario, toma el id desde ahí
     if isinstance(u, dict) and u.get("id"):
         return u.get("id")
+    
+    # Si no hay sesión iniciada, devuelve None
     return None
-
 
 def current_user_name():
-    """Devuelve nombre del usuario en sesión (si existe)."""
+    """Devuelve el nombre del usuario actualmente en sesión (si existe)."""
+    
+    # Primero intenta obtener el usuario almacenado directamente en session_state["user"]
     u = st.session_state.get("user")
+    
+    # Si existe un diccionario de usuario y tiene un nombre, lo devuelve al tiro
     if isinstance(u, dict) and u.get("nombre"):
         return u.get("nombre")
+
+    # Si no está en session_state["user"], intenta obtener el ID del usuario conectado
     uid = current_user_id()
+    
     if uid:
+        # Busca al usuario en la base de datos
         row = db.get_user_by_id(uid)
         if row:
+            # Devuelve el nombre; si no tiene nombre, devuelve su email como fallback
             return row.get("nombre") or row.get("email")
+
+    # Si no hay usuario logueado, devuelve None
     return None
-
-
 # -------------------------
-# session defaults
+# Valores por defecto para session_state
 # -------------------------
+
+# Diccionario con todos los valores iniciales de la sesión
 defaults = {
-    "page": "inicio",
-    "user": None,
-    "user_id": 0,
-    "selected_user_id": None,
-    "categoria": None,
-    "servicio": None,
-    "ubicacion": None,
-    "publish_cat": None,
-    "publish_service": None,
-    # búsqueda/filtrado
-    "search_term": "",
-    "search_comuna": "",
-    "results_filter_price_min": "",
-    "results_filter_price_max": "",
-    "results_filter_rating_min": "",
-    # NUEVOS para sistema de trabajos
-    "solicitar_servicio_id": None,
-    "solicitar_trabajador_id": None,
-    "ver_trabajo_id": None,
-    "show_new_chat_selector": False,
+    "page": "inicio",                 # Página actual que está viendo el usuario
+    "user": None,                     # Datos completos del usuario logueado
+    "user_id": 0,                     # ID del usuario (modo rápido)
+    "selected_user_id": None,         # Usuario seleccionado en chats o perfiles
+
+    "categoria": None,                # Categoría seleccionada al buscar
+    "servicio": None,                 # Servicio seleccionado
+    "ubicacion": None,                # Ubicación seleccionada
+
+    "publish_cat": None,              # Categoría en creación de publicación
+    "publish_service": None,          # Servicio en creación de publicación
+
+    # --- Filtros de búsqueda ---
+    "search_term": "",                # Palabra clave de la búsqueda
+    "search_comuna": "",              # Comuna que filtra resultados
+    "results_filter_price_min": "",   # Filtro: precio mínimo
+    "results_filter_price_max": "",   # Filtro: precio máximo
+    "results_filter_rating_min": "",  # Filtro: calificación mínima
+
+    # --- Sistema de trabajos ---
+    "solicitar_servicio_id": None,    # ID del servicio que el usuario quiere solicitar
+    "solicitar_trabajador_id": None,  # ID del trabajador al que se le pedirá el servicio
+    "ver_trabajo_id": None,           # ID de un trabajo para verlo en detalle
+    "show_new_chat_selector": False,  # Muestra selector para iniciar chat nuevo
 }
+
+# Inicializa cada valor solo si no existe ya en session_state
 for k, v in defaults.items():
     st.session_state.setdefault(k, v)
+
 
 
 # -------------------------
 # Comunas (lista completa de Santiago)
 # -------------------------
+# Esta es una lista fija de comunas que usaremos en los filtros de búsqueda
+# y en los formularios donde el usuario elige de qué comuna es o dónde ofrece un servicio.
 comunas_santiago = [
     "Cerrillos","Cerro Navia","Conchalí","El Bosque","Estación Central","Huechuraba",
     "Independencia","La Cisterna","La Florida","La Granja","La Pintana","La Reina",
@@ -89,27 +126,47 @@ comunas_santiago = [
 # -------------------------
 # Top bar (logo/nombre) y home button
 # -------------------------
+
+# Se agrega CSS personalizado para crear una barra fija arriba de la pantalla
+# Esta barra funciona como encabezado de la app y le da una identidad visual.
 st.markdown(
     """
     <style>
-    .top-bar{position:fixed; top:0; left:0; right:0; height:64px;
-    background:#2E8B57; color:white; display:flex; align-items:center; justify-content:center;
-    font-size:22px; font-weight:700; z-index:9999; box-shadow:0 2px 8px rgba(0,0,0,0.08);}
+    .top-bar{
+        position:fixed; top:0; left:0; right:0; height:64px;
+        background:#2E8B57; 
+        color:white; 
+        display:flex; 
+        align-items:center; 
+        justify-content:center;
+        font-size:22px; 
+        font-weight:700; 
+        z-index:9999; 
+        box-shadow:0 2px 8px rgba(0,0,0,0.08);
+    }
+    /* Empuja el contenido hacia abajo para que no quede oculto detrás del top bar */
     .main > div { margin-top: 90px; margin-bottom: 40px; }
     </style>
+
+    <!-- Contenedor HTML que muestra el título principal -->
     <div class="top-bar">ConectaServicios</div>
     """,
     unsafe_allow_html=True,
 )
-# home boton (accesible en todo momento)
+
+# Botón de Inicio (siempre disponible)
+# Permite volver a la página principal desde cualquier parte.
 if st.button("🏠 Inicio", key="home_btn"):
     st.session_state.page = "inicio"
     rerun_safe()
-
 # -------------------------
 # Sidebar navigation (simple)
 # -------------------------
+
+# Lista de páginas que queremos mostrar en el menú lateral
 pages_display = ["Inicio", "Iniciar sesión", "Registrarse", "Perfil", "Mis Trabajos", "Chats", "Notificaciones"]
+
+# Mapeo entre el texto que ve el usuario y la clave interna que usa la app
 mapping = {
     "Inicio": "inicio",
     "Iniciar sesión": "login",
@@ -121,44 +178,58 @@ mapping = {
 }
 
 def page_to_label(page_key):
-    # Solo mapeamos las páginas que están en el radio
+    """
+    Convierte una clave interna ('perfil', 'chats', etc.)
+    en la etiqueta visible del menú ('Perfil', 'Chats', etc.)
+    Solo lo usamos para que el sidebar se mantenga sincronizado
+    con la página actual.
+    """
     for label, key in mapping.items():
         if key == page_key:
             return label
-    # Si la página actual no está en el radio, devolvemos None
-    return None
+    return None  # Si es una subpágina que no aparece en el menú
 
+
+# -- Construcción del sidebar --
 with st.sidebar:
     st.markdown("### Navegación")
+
+    # Mostramos el nombre del usuario o "Invitado"
     if current_user_name():
         st.markdown(f"**{current_user_name()}**")
     else:
         st.markdown("**Invitado**")
 
+    # Identifica qué página está actualmente activa
     current_label = page_to_label(st.session_state.get("page", "inicio"))
-    
-    # Solo mostramos el radio si estamos en una página "principal"
+
+    # Si la página actual pertenece al menú principal, mostramos el radio
     if current_label:
         try:
             sel_index = pages_display.index(current_label)
         except Exception:
             sel_index = 0
         
+        # Menú de navegación lateral
         selection = st.radio("Ir a:", pages_display, index=sel_index, key="sidebar_nav_radio")
         selected_page = mapping.get(selection, "inicio")
         
-        # Solo cambiamos si el usuario REALMENTE seleccionó algo diferente en el radio
+        # Solo cambiamos de página si el usuario eligió otra
         if selected_page != st.session_state.get("page"):
             st.session_state.page = selected_page
             rerun_safe()
+
     else:
-        # Si estamos en subcategoria, ubicacion, resultados, etc.
+        # Cuando estás en páginas que NO aparecen en el sidebar (subpáginas)
         st.info(f"📍 {st.session_state.get('page', 'navegando').replace('_', ' ').title()}")
         st.write("Usa los botones de navegación en la página principal.")
 
     st.markdown("---")
+
+    # Botón de cerrar sesión
     if current_user_id():
         if st.button("🔒 Cerrar sesión", key="logout_btn"):
+            # Reset de los datos de sesión
             st.session_state.user = None
             st.session_state.user_id = 0
             st.session_state.selected_user_id = None
@@ -167,25 +238,81 @@ with st.sidebar:
 
 
 # -------------------------
-# Styles
+# Styles (estilos personalizados)
 # -------------------------
+
+# CSS personalizado para mejorar la apariencia de la app
 st.markdown(
     """
     <style>
-    div.stButton > button { height:56px; width:200px; background:#2E8B57; color:white; border-radius:10px; font-size:15px; margin:6px 8px; border:none; }
-    div.stButton > button:hover { background-color:#276e47; transform: translateY(-1px); }
-    .conecta-title { text-align:center; margin-bottom:8px; }
-    .service-card { border:1px solid rgba(0,0,0,0.06); padding:12px; border-radius:8px; margin-bottom:10px; }
-    .chat-bubble { padding:10px 12px; border-radius:12px; margin:6px 0; display:inline-block; max-width:70%; }
-    .chat-right { background:#DCF8C6; text-align:right; float:right; clear:both; }
-    .chat-left { background:#F1F0F0; text-align:left; float:left; clear:both; }
-    .chat-time { font-size:10px; color:#666; margin-top:4px; display:block; }
+    /* Botones estándar */
+    div.stButton > button {
+        height:56px; 
+        width:200px; 
+        background:#2E8B57; 
+        color:white; 
+        border-radius:10px; 
+        font-size:15px; 
+        margin:6px 8px; 
+        border:none;
+    }
+
+    /* Hover de botones */
+    div.stButton > button:hover {
+        background-color:#276e47; 
+        transform: translateY(-1px);
+    }
+
+    /* Títulos centrados */
+    .conecta-title {
+        text-align:center; 
+        margin-bottom:8px;
+    }
+
+    /* Estilo de las tarjetas de servicios */
+    .service-card {
+        border:1px solid rgba(0,0,0,0.06); 
+        padding:12px; 
+        border-radius:8px; 
+        margin-bottom:10px;
+    }
+
+    /* Burbujas de chat */
+    .chat-bubble { 
+        padding:10px 12px; 
+        border-radius:12px; 
+        margin:6px 0; 
+        display:inline-block; 
+        max-width:70%;
+    }
+
+    /* Mensajes enviados por el usuario */
+    .chat-right { 
+        background:#DCF8C6; 
+        text-align:right; 
+        float:right; 
+        clear:both;
+    }
+
+    /* Mensajes recibidos */
+    .chat-left { 
+        background:#F1F0F0; 
+        text-align:left; 
+        float:left; 
+        clear:both;
+    }
+
+    /* Hora del mensaje */
+    .chat-time { 
+        font-size:10px; 
+        color:#666; 
+        margin-top:4px; 
+        display:block;
+    }
     </style>
-""",
+    """,
     unsafe_allow_html=True,
 )
-
-
 # -------------------------
 # Reusable options map
 # -------------------------
@@ -257,50 +384,189 @@ elif st.session_state.get("page") == "subcategoria":
                     if st.button(opt, key=f"subcat_opt_{i+idx}"):
                         st.session_state.servicio = opt
                         st.session_state.page = "ubicacion"
+                        rerun_safe()# -------------------------
+# Reusable options map
+# -------------------------
+# Este diccionario define todas las categorías y sus subcategorías.
+# Se usa tanto en la pantalla de inicio como en el perfil al publicar servicios.
+opciones_map = {
+    "Mascotas": ["Pasear perros", "Cuidar gatos", "Aseo de mascotas", "Adiestramiento", "Cuidado nocturno"],
+    "Hogar": ["Limpieza general", "Cuidado de jardín", "Arreglo básico", "Electricidad", "Pintura", "Gasfitería"],
+    "Clases": ["Matemáticas", "Inglés", "Música", "Computación", "Arte", "Programación"],
+    "Niños": ["Cuidado por horas", "Apoyo escolar", "Actividades recreativas", "Acompañamiento", "Transporte escolar"],
+}
+
+
+# -------------------------
+# PAGES: flujo solicitado
+# -------------------------
+# ---------------------------
+# PÁGINA DE INICIO
+# ---------------------------
+if st.session_state.get("page") == "inicio":
+    # Título principal
+    st.markdown('<h1 class="conecta-title">🤝 Conecta</h1>', unsafe_allow_html=True)
+    st.write("Encuentra personas que ofrecen los servicios que necesitas.")
+    st.subheader("Selecciona una categoría:")
+
+    # Dos columnas para mostrar botones grandes
+    c1, c2 = st.columns(2)
+
+    # Primera columna
+    with c1:
+        # Categoría Mascotas
+        if st.button("Cuidado de mascotas", key="btn_mascotas", use_container_width=True):
+            st.session_state.categoria = "Mascotas"
+            st.session_state.page = "subcategoria"
+            st.rerun()
+
+        # Categoría Hogar
+        if st.button("Limpieza y hogar", key="btn_hogar", use_container_width=True):
+            st.session_state.categoria = "Hogar"
+            st.session_state.page = "subcategoria"
+            st.rerun()
+
+    # Segunda columna
+    with c2:
+        # Categoría Clases
+        if st.button("Clases particulares", key="btn_clases", use_container_width=True):
+            st.session_state.categoria = "Clases"
+            st.session_state.page = "subcategoria"
+            st.rerun()
+
+        # Categoría Niños
+        if st.button("Cuidado de niños", key="btn_ninos", use_container_width=True):
+            st.session_state.categoria = "Niños"
+            st.session_state.page = "subcategoria"
+            st.rerun()
+
+
+# ---------------------------
+# SUBCATEGORÍA
+# ---------------------------
+elif st.session_state.get("page") == "subcategoria":
+
+    # Título dinámico según la categoría seleccionada
+    st.markdown(
+        f'<h1 class="conecta-title">Categoría: {st.session_state.get("categoria") or "-"}</h1>',
+        unsafe_allow_html=True
+    )
+
+    # Botón para volver
+    if st.button("⬅️ Volver", key="volver_subcat"):
+        st.session_state.page = "inicio"
+        rerun_safe()
+
+    # Lista de opciones según la categoría
+    lista = opciones_map.get(st.session_state.get("categoria"), [])
+
+    if not lista:
+        st.info("No hay opciones para esta categoría.")
+    else:
+        st.write("Busca o selecciona una opción:")
+
+        # Buscador simple para filtrar subcategorías
+        filtro = st.text_input("Filtrar opciones...", key="subcat_busqueda")
+
+        # Si se escribe algo, filtramos la lista
+        filtered = [x for x in lista if filtro.lower() in x.lower()] if filtro else lista
+
+        # Se muestran en una cuadrícula de 3 columnas
+        cols_per_row = 3
+        for i in range(0, len(filtered), cols_per_row):
+            cols = st.columns(cols_per_row)
+            for idx, opt in enumerate(filtered[i:i + cols_per_row]):
+                with cols[idx]:
+                    # Cada opción es un botón
+                    if st.button(opt, key=f"subcat_opt_{i+idx}"):
+                        st.session_state.servicio = opt
+                        st.session_state.page = "ubicacion"
                         rerun_safe()
-
-
 # ---------- UBICACION ----------
 elif st.session_state.get("page") == "ubicacion":
+
+    # Título de la página
     st.markdown('<h1 class="conecta-title">📍 Selecciona tu ubicación</h1>', unsafe_allow_html=True)
+
+    # Botón para volver a la subcategoría
     if st.button("⬅️ Volver", key="volver_ubic"):
         st.session_state.page = "subcategoria"
         rerun_safe()
 
+    # Selección de comuna
     st.write("Selecciona la comuna donde quieres buscar el servicio:")
+
+    # Por ahora la ciudad es fija
     ciudad = st.selectbox("Ciudad:", ["Santiago"], index=0, key="ubic_ciudad")
+
+    # Lista completa de comunas
     comuna = st.selectbox("Comuna:", [""] + comunas_santiago, index=0, key="ubic_comuna")
     
+    # Confirmar búsqueda
     if st.button("Buscar resultados en esta ubicación", key="ubic_buscar_btn"):
         if not comuna:
             st.warning("Selecciona una comuna para limitar la búsqueda.")
         else:
+            # Guardamos la ubicación y pasamos a resultados
             st.session_state.ubicacion = f"{comuna}, {ciudad}"
             st.session_state.page = "resultados"
             rerun_safe()
+
+
+
 # ---------- RESULTADOS ----------
 elif st.session_state.get("page") == "resultados":
+
+    # Servicio buscado (puede venir del buscador o del flujo guiado)
     servicio = st.session_state.get("servicio", "") or st.session_state.get("search_term", "")
-    ubic = st.session_state.get("ubicacion", "") or (st.session_state.get("search_comuna") and f"{st.session_state.get('search_comuna')}, Santiago") or ""
-    st.markdown(f'<h1 class="conecta-title">Resultados: {servicio} — {ubic or "Todas las comunas"}</h1>', unsafe_allow_html=True)
+
+    # Ubicación seleccionada
+    ubic = (
+        st.session_state.get("ubicacion", "") or
+        (st.session_state.get("search_comuna") and f"{st.session_state.get('search_comuna')}, Santiago") or ""
+    )
+
+    # Título dinámico
+    st.markdown(
+        f'<h1 class="conecta-title">Resultados: {servicio} — {ubic or "Todas las comunas"}</h1>',
+        unsafe_allow_html=True
+    )
     
+    # Botón volver
     if st.button("⬅️ Volver", key="volver_resultados"):
+        # Si viene del flujo guiado, vuelve a ubicación
         if st.session_state.get("servicio") and st.session_state.get("ubicacion"):
             st.session_state.page = "ubicacion"
         else:
+            # Si viene del buscador libre, vuelve al inicio
             st.session_state.page = "inicio"
         rerun_safe()
 
-    # Filtros en una sola fila
+    # -------------------------
+    # Filtros
+    # -------------------------
     st.subheader("Filtros y Ordenamiento")
     col1, col2, col3, col4 = st.columns(4)
     
+    # Precio mínimo
     with col1:
-        pmin = st.text_input("💰 Precio mín", value=st.session_state.get("results_filter_price_min", ""), key="f_pmin", placeholder="Ej: 5000")
+        pmin = st.text_input(
+            "💰 Precio mín",
+            value=st.session_state.get("results_filter_price_min", ""),
+            key="f_pmin",
+            placeholder="Ej: 5000"
+        )
     
+    # Precio máximo
     with col2:
-        pmax = st.text_input("💰 Precio máx", value=st.session_state.get("results_filter_price_max", ""), key="f_pmax", placeholder="Ej: 50000")
+        pmax = st.text_input(
+            "💰 Precio máx",
+            value=st.session_state.get("results_filter_price_max", ""),
+            key="f_pmax",
+            placeholder="Ej: 50000"
+        )
     
+    # Ordenamiento
     with col3:
         orden_opciones = [
             "Más recientes primero",
@@ -309,8 +575,14 @@ elif st.session_state.get("page") == "resultados":
             "Alfabético (A-Z)",
             "Alfabético (Z-A)"
         ]
-        orden_seleccionado = st.selectbox("🔽 Ordenar por", orden_opciones, index=0, key="orden_select")
+        orden_seleccionado = st.selectbox(
+            "🔽 Ordenar por",
+            orden_opciones,
+            index=0,
+            key="orden_select"
+        )
     
+    # Botón aplicar filtros
     with col4:
         st.write("")
         st.write("")
@@ -322,15 +594,24 @@ elif st.session_state.get("page") == "resultados":
 
     st.markdown("---")
 
-    # obtener servicios de la BD
+    # -------------------------
+    # Obtener servicios desde BD
+    # -------------------------
     term = servicio or ""
     comuna_name = ubic.split(",")[0] if ubic else None
+    
+    # Consulta principal
     servicios = db.get_services_filtered(term, comuna_name)
 
-    # aplicar filtros locales (precio)
+    # -------------------------
+    # Filtros de precio locales
+    # -------------------------
     filtered_services = []
+
     for s in servicios:
         ok = True
+
+        # Convertir filtros a números
         try:
             pmin_v = float(st.session_state.get("results_filter_price_min")) if st.session_state.get("results_filter_price_min") else None
             pmax_v = float(st.session_state.get("results_filter_price_max")) if st.session_state.get("results_filter_price_max") else None
@@ -338,6 +619,8 @@ elif st.session_state.get("page") == "resultados":
             pmin_v = pmax_v = None
 
         price = s.get("price")
+
+        # Aplicar reglas
         if price is not None and pmin_v is not None and price < pmin_v:
             ok = False
         if price is not None and pmax_v is not None and price > pmax_v:
@@ -346,7 +629,9 @@ elif st.session_state.get("page") == "resultados":
         if ok:
             filtered_services.append(s)
 
-    # Aplicar ordenamiento
+    # -------------------------
+    # Ordenamiento
+    # -------------------------
     orden = st.session_state.get("results_order", "Más recientes primero")
     
     if orden == "Precio: menor a mayor":
@@ -367,10 +652,15 @@ elif st.session_state.get("page") == "resultados":
     elif orden == "Alfabético (Z-A)":
         filtered_services.sort(key=lambda x: x["service"].lower(), reverse=True)
 
+    # -------------------------
+    # Mostrar resultados
+    # -------------------------
     if filtered_services:
         st.success(f"{len(filtered_services)} resultado(s) encontrados")
         
         for s in filtered_services:
+
+            # Tarjeta visual del servicio
             st.markdown(
                 f'<div class="service-card"><b>{s["service"]}</b> — {s["category"]} <br>'
                 f'Proveedor: <b>{s["user_nombre"]}</b> — {s.get("comunas") or "Sin comunas"}<br>'
@@ -379,8 +669,10 @@ elif st.session_state.get("page") == "resultados":
                 unsafe_allow_html=True,
             )
             
+            # Botones de acción
             cols = st.columns([1, 1, 1])
             
+            # Ver perfil
             with cols[0]:
                 if st.button("👤 Ver perfil", key=f"verperfil_{s['id']}"):
                     st.session_state.perfil_usuario = {
@@ -393,12 +685,14 @@ elif st.session_state.get("page") == "resultados":
                     st.session_state.page = "perfil_publico"
                     rerun_safe()
             
+            # Chatear
             with cols[1]:
                 if st.button(f"💬 Chatear", key=f"chat_result_{s['id']}"):
                     st.session_state.selected_user_id = s["user_id"]
                     st.session_state.page = "chats"
                     rerun_safe()
             
+            # Solicitar trabajo
             with cols[2]:
                 if current_user_id() and current_user_id() != s["user_id"]:
                     if st.button(f"✅ Solicitar", key=f"solicitar_result_{s['id']}"):
@@ -406,6 +700,7 @@ elif st.session_state.get("page") == "resultados":
                         st.session_state.solicitar_trabajador_id = s["user_id"]
                         st.session_state.page = "solicitar_servicio"
                         rerun_safe()
+
     else:
         st.info("No hay servicios publicados que coincidan con tu búsqueda.")
 
