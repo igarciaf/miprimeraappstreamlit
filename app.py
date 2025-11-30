@@ -408,113 +408,174 @@ elif st.session_state.get("page") == "resultados":
     else:
         st.info("No hay servicios publicados que coincidan con tu búsqueda.")
 
-
 # ---------- PERFIL PÚBLICO ----------
 elif st.session_state.get("page") == "perfil_publico":
-    # (EN PRESENTACIÓN) Muestra la información pública del proveedor seleccionado.
+
+    # (SE MUESTRA EN LA PRESENTACIÓN)
+    # Aquí se muestra la información del proveedor que el usuario seleccionó
+    # desde los resultados o desde otra parte de la app.
     perfil = st.session_state.get("perfil_usuario", {})
-    st.markdown(f'<h1 class="conecta-title">👤 Perfil de {perfil.get("nombre","Usuario")}</h1>', unsafe_allow_html=True)
+
+    # Título dinámico con el nombre del proveedor
+    st.markdown(
+        f'<h1 class="conecta-title">👤 Perfil de {perfil.get("nombre", "Usuario")}</h1>',
+        unsafe_allow_html=True
+    )
+
+    # Botón para volver a la página anterior (Resultados)
     if st.button("⬅️ Volver", key="volver_perfil_publico"):
         st.session_state.page = "resultados"
         rerun_safe()
-    st.write(f"**Servicio:** {perfil.get('servicio','-')}")
-    st.write(f"**Valoración:** {perfil.get('valoracion','-')}")
-    st.write(f"**Bio:** {perfil.get('bio','')}")
+
+    # Información principal del perfil
+    st.write(f"**Servicio:** {perfil.get('servicio', '-')}")
+    st.write(f"**Valoración:** {perfil.get('valoracion', '-')}")
+    st.write(f"**Bio:** {perfil.get('bio', '')}")
+
+    # Botón para iniciar un chat con esta persona
+    # Al hacer clic, se guarda su ID para abrir el chat correspondiente
     if st.button("Iniciar chat con esta persona", key="perfil_publico_chat"):
         if perfil.get("id"):
-            st.session_state.selected_user_id = perfil.get("id")
+            st.session_state.selected_user_id = perfil["id"]
             st.session_state.page = "chats"
             rerun_safe()
 
 
+
 # ---------- CHATS ----------
 elif st.session_state.get("page") == "chats":
-    # (EN PRESENTACIÓN) Módulo de mensajería entre usuarios.
+    # (EN PRESENTACIÓN)
+    # Esta sección contiene el módulo completo de mensajería entre usuarios.
+
     st.markdown('<h1 class="conecta-title">💬 Chats</h1>', unsafe_allow_html=True)
+
+    # El chat solo funciona si el usuario ha iniciado sesión.
     if not current_user_id():
         st.warning("Debes iniciar sesión para usar el chat.")
     else:
+
+        # Obtener las conversaciones más recientes del usuario
         recent_chats = db.get_recent_chats(current_user_id())
         receptor_id = st.session_state.get("selected_user_id")
+
+        # Estructura en dos columnas: lista de chats y conversación activa
         col_list, col_chat = st.columns([1, 2])
 
+        # ----------- LISTA DE CONVERSACIONES -----------
         with col_list:
             st.subheader("Conversaciones")
+
+            # Mostrar cada chat reciente con preview del último mensaje
             if recent_chats:
                 for chat in recent_chats:
                     preview = chat['last_message'][:30] + "..." if len(chat['last_message']) > 30 else chat['last_message']
                     time_preview = chat['last_timestamp'][11:16] if chat['last_timestamp'] else ""
+
+                    # Resaltar si este chat es el que está seleccionado
                     is_selected = (receptor_id == chat['other_user_id'])
                     button_style = "🟢" if is_selected else "💬"
-                    if st.button(f"{button_style} {chat['other_user_name']}\n{preview} · {time_preview}", key=f"chat_item_{chat['other_user_id']}", use_container_width=True):
+
+                    # Botón para abrir este chat
+                    if st.button(
+                        f"{button_style} {chat['other_user_name']}\n{preview} · {time_preview}",
+                        key=f"chat_item_{chat['other_user_id']}",
+                        use_container_width=True
+                    ):
                         st.session_state.selected_user_id = chat['other_user_id']
                         rerun_safe()
+
                 st.markdown("---")
 
+            # ---------- NUEVO CHAT ----------
             if st.button("➕ Nuevo chat", key="new_chat_btn", use_container_width=True):
+                # Mostrar selector de usuarios con los que todavía no se ha hablado
                 conn = db.get_conn()
                 cur = conn.cursor()
                 cur.execute("SELECT id, nombre FROM users WHERE id != ?", (current_user_id(),))
                 rows = cur.fetchall()
                 conn.close()
+
                 others = [dict(r) for r in rows]
                 chat_user_ids = [c['other_user_id'] for c in recent_chats] if recent_chats else []
                 new_users = [u for u in others if u['id'] not in chat_user_ids]
+
                 if new_users:
                     st.session_state.show_new_chat_selector = True
                     rerun_safe()
                 else:
                     st.info("Ya tienes chats con todos los usuarios.")
 
+            # Selector para elegir con quién iniciar un nuevo chat
             if st.session_state.get("show_new_chat_selector"):
                 conn = db.get_conn()
                 cur = conn.cursor()
                 cur.execute("SELECT id, nombre FROM users WHERE id != ?", (current_user_id(),))
                 rows = cur.fetchall()
                 conn.close()
+
                 others = [dict(r) for r in rows]
                 chat_user_ids = [c['other_user_id'] for c in recent_chats] if recent_chats else []
                 new_users = [u for u in others if u['id'] not in chat_user_ids]
+
                 if new_users:
                     names = [u["nombre"] for u in new_users]
                     sel = st.selectbox("Selecciona usuario:", names, key="new_chat_select")
+
                     if st.button("Iniciar chat", key="start_new_chat"):
                         selected_user = next(u for u in new_users if u["nombre"] == sel)
                         st.session_state.selected_user_id = selected_user["id"]
                         st.session_state.show_new_chat_selector = False
                         rerun_safe()
+
                     if st.button("Cancelar", key="cancel_new_chat"):
                         st.session_state.show_new_chat_selector = False
                         rerun_safe()
 
+        # ----------- CONTENIDO DEL CHAT ABIERTO -----------
         with col_chat:
             if receptor_id:
                 receptor = db.get_user_by_id(receptor_id)
+
                 if receptor:
                     st.subheader(f"Chat con {receptor['nombre']}")
+
+                    # Obtener historial de mensajes entre ambos usuarios
                     mensajes = db.get_messages_between(current_user_id(), receptor_id)
+
+                    # Mostrar mensajes
                     if mensajes:
                         for m in mensajes:
                             autor = "Tú" if m["emisor_id"] == current_user_id() else receptor["nombre"]
                             clase = "chat-right" if autor == "Tú" else "chat-left"
+
                             st.markdown(
                                 f'<div class="chat-bubble {clase}"><b>{autor}:</b> {m["contenido"]}'
                                 f'<span class="chat-time">{m["timestamp"][11:16]}</span></div>',
                                 unsafe_allow_html=True,
                             )
                         st.markdown('<div style="clear:both;"></div>', unsafe_allow_html=True)
+
                     else:
                         st.info("No hay mensajes aún. Escribe el primero.")
 
+                    # Formulario para enviar un mensaje nuevo
                     with st.form("send_msg_form", clear_on_submit=True):
                         nuevo = st.text_input("Escribe un mensaje", key="new_msg_input", placeholder="Escribe aquí...")
                         col1, col2 = st.columns([5, 1])
+
                         with col2:
                             send_btn = st.form_submit_button("Enviar", use_container_width=True)
+
                         if send_btn:
                             if nuevo and nuevo.strip():
                                 db.add_message(current_user_id(), receptor_id, nuevo.strip())
-                                db.add_notification(receptor_id, "mensaje", f"Nuevo mensaje de {current_user_name() or 'Usuario'}")
+
+                                # Notificación al receptor
+                                db.add_notification(
+                                    receptor_id,
+                                    "mensaje",
+                                    f"Nuevo mensaje de {current_user_name() or 'Usuario'}"
+                                )
                                 rerun_safe()
                             else:
                                 st.warning("Escribe un mensaje antes de enviar.")
@@ -522,7 +583,6 @@ elif st.session_state.get("page") == "chats":
                     st.warning("Usuario no encontrado.")
             else:
                 st.info("👈 Selecciona una conversación o inicia un nuevo chat")
-
 
 # ========== NOTIFICACIONES ==========
 elif st.session_state.get("page") == "notificaciones":
