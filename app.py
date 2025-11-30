@@ -99,27 +99,6 @@ comunas_santiago = [
 ]
 
 
-# -------------------------
-# Top bar (logo/nombre) y home button
-# -------------------------
-# (EN PRESENTACIÓN) CSS para la barra superior y empuje del contenido.
-st.markdown(
-    """
-    <style>
-    .top-bar{position:fixed; top:0; left:0; right:0; height:64px;
-    background:#2E8B57; color:white; display:flex; align-items:center; justify-content:center;
-    font-size:22px; font-weight:700; z-index:9999; box-shadow:0 2px 8px rgba(0,0,0,0.08);}
-    .main > div { margin-top: 90px; margin-bottom: 40px; }
-    </style>
-    <div class="top-bar">ConectaServicios</div>
-    """,
-    unsafe_allow_html=True,
-)
-
-if st.button("🏠 Inicio", key="home_btn"):
-    st.session_state.page = "inicio"
-    rerun_safe()
-
 
 # -------------------------
 # Sidebar navigation (simple)
@@ -205,6 +184,37 @@ opciones_map = {
     "Clases": ["Matemáticas", "Inglés", "Música", "Computación", "Arte", "Programación"],
     "Niños": ["Cuidado por horas", "Apoyo escolar", "Actividades recreativas", "Acompañamiento", "Transporte escolar"],
 }
+# -------------------------
+# TOP BAR global (siempre visible)
+# -------------------------
+st.markdown(
+    """
+    <style>
+    .top-bar{
+        position: fixed;
+        top: 0; left: 0; right: 0;
+        height: 64px;
+        background: #2E8B57;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        font-weight: 700;
+        z-index: 9999;
+        box-shadow:0 2px 8px rgba(0,0,0,0.08);
+    }
+    .main > div { margin-top: 90px; }
+    </style>
+    <div class="top-bar">ConectaServicios</div>
+    """,
+    unsafe_allow_html=True,
+)
+
+# botón siempre visible
+if st.button("🏠 Inicio", key="home_btn"):
+    st.session_state.page = "inicio"
+    rerun_safe()
 
 
 # -------------------------
