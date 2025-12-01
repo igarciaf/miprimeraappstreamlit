@@ -144,7 +144,14 @@ with st.sidebar:
         st.info(f"📍 {st.session_state.get('page', 'navegando').replace('_', ' ').title()}")
         st.write("Usa los botones de navegación en la página principal.")
 
-
+    st.markdown("---")
+    if current_user_id():
+        if st.button("🔒 Cerrar sesión", key="logout_btn"):
+            st.session_state.user = None
+            st.session_state.user_id = 0
+            st.session_state.selected_user_id = None
+            st.session_state.page = "inicio"
+            rerun_safe()
 # -------------------------
 # Styles
 # -------------------------
