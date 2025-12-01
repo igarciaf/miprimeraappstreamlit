@@ -1,21 +1,37 @@
-# db.py
+# db.py — Módulo de base de datos para ConectaServicios
+# (EN PRESENTACIÓN) Aquí se manejan TODOS los datos de la app: usuarios, servicios,
+# chats, trabajos, evaluaciones y notificaciones.
+
 from typing import Optional, List, Dict
 import sqlite3
 import os
 from datetime import datetime
 
+# Ruta del archivo SQLite
 DB_FILENAME = os.path.join(os.path.dirname(__file__), "conecta.db")
 
+# -----------------------------
+# CONEXIÓN A BASE DE DATOS
+# -----------------------------
 def get_conn():
+    """Devuelve una conexión a SQLite con filas accesibles como diccionarios."""
     conn = sqlite3.connect(DB_FILENAME, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     return conn
 
+
+# -----------------------------
+# CREACIÓN DE TABLAS
+# -----------------------------
 def init_db():
+    """
+    (EN PRESENTACIÓN) Esta función se ejecuta una sola vez.
+    Crea todas las tablas necesarias para que la app funcione.
+    """
     conn = get_conn()
     cur = conn.cursor()
-    
-    # users
+
+    # Tabla de usuarios
     cur.execute("""
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -27,8 +43,8 @@ def init_db():
         created_at TEXT
     )
     """)
-    
-    # services (publicaciones)
+
+    # Tabla de servicios
     cur.execute("""
     CREATE TABLE IF NOT EXISTS services (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -41,8 +57,8 @@ def init_db():
         FOREIGN KEY (user_id) REFERENCES users(id)
     )
     """)
-    
-    # messages
+
+    # Tabla de mensajes del chat
     cur.execute("""
     CREATE TABLE IF NOT EXISTS messages (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -54,8 +70,8 @@ def init_db():
         FOREIGN KEY (receptor_id) REFERENCES users(id)
     )
     """)
-    
-    # notifications
+
+    # Tabla de notificaciones
     cur.execute("""
     CREATE TABLE IF NOT EXISTS notifications (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -67,8 +83,8 @@ def init_db():
         FOREIGN KEY (usuario_id) REFERENCES users(id)
     )
     """)
-    
-    # trabajos (solicitudes de servicio)
+
+    # Tabla de trabajos (solicitudes entre usuarios)
     cur.execute("""
     CREATE TABLE IF NOT EXISTS trabajos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -91,8 +107,8 @@ def init_db():
         FOREIGN KEY (trabajador_id) REFERENCES users(id)
     )
     """)
-    
-    # evaluaciones
+
+    # Tabla de evaluaciones
     cur.execute("""
     CREATE TABLE IF NOT EXISTS evaluaciones (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -111,39 +127,34 @@ def init_db():
         FOREIGN KEY (trabajador_id) REFERENCES users(id)
     )
     """)
-    
-    # fotos_trabajos
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS fotos_trabajos (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        trabajo_id INTEGER NOT NULL,
-        foto_base64 TEXT NOT NULL,
-        descripcion TEXT,
-        fecha TEXT,
-        FOREIGN KEY (trabajo_id) REFERENCES trabajos(id)
-    )
-    """)
-    
+
     conn.commit()
     conn.close()
 
-# ============ USERS ============
 
-def create_user(nombre: str, email: str, password_hash: str, bio: Optional[str]=None, comuna: Optional[str]=None) -> int:
+# ================================================================
+# USUARIOS
+# ================================================================
+def create_user(nombre: str, email: str, password_hash: str,
+                bio: Optional[str] = None, comuna: Optional[str] = None) -> int:
+    """Registra un nuevo usuario."""
     conn = get_conn()
     cur = conn.cursor()
-    created_at = datetime.utcnow().isoformat()
+    created = datetime.utcnow().isoformat()
+
     try:
-        cur.execute(
-            "INSERT INTO users (nombre, email, password_hash, bio, comuna, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-            (nombre, email, password_hash, bio, comuna, created_at)
-        )
+        cur.execute("""
+            INSERT INTO users (nombre, email, password_hash, bio, comuna, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (nombre, email, password_hash, bio, comuna, created))
         conn.commit()
-        user_id = cur.lastrowid
+        uid = cur.lastrowid
     except sqlite3.IntegrityError:
-        user_id = 0
+        uid = 0
+
     conn.close()
-    return user_id
+    return uid
+
 
 def get_user_by_email(email: str) -> Optional[Dict]:
     conn = get_conn()
@@ -152,6 +163,7 @@ def get_user_by_email(email: str) -> Optional[Dict]:
     row = cur.fetchone()
     conn.close()
     return dict(row) if row else None
+
 
 def get_user_by_id(user_id: int) -> Optional[Dict]:
     if not user_id:
@@ -163,36 +175,44 @@ def get_user_by_id(user_id: int) -> Optional[Dict]:
     conn.close()
     return dict(row) if row else None
 
-def update_user_profile(user_id: int, nombre: str=None, bio: str=None, comuna: str=None):
+
+def update_user_profile(user_id: int, nombre: str=None,
+                        bio: str=None, comuna: str=None):
+    """Actualiza información del perfil del usuario."""
     conn = get_conn()
     cur = conn.cursor()
-    if nombre is not None:
+    if nombre:
         cur.execute("UPDATE users SET nombre = ? WHERE id = ?", (nombre, user_id))
-    if bio is not None:
+    if bio:
         cur.execute("UPDATE users SET bio = ? WHERE id = ?", (bio, user_id))
-    if comuna is not None:
+    if comuna:
         cur.execute("UPDATE users SET comuna = ? WHERE id = ?", (comuna, user_id))
     conn.commit()
     conn.close()
 
-# ============ SERVICES ============
 
-def add_service(user_id: int, category: str, service: str, comunas: Optional[str]=None, price: Optional[float]=None) -> int:
+# ================================================================
+# SERVICIOS
+# ================================================================
+def add_service(user_id: int, category: str, service: str,
+                comunas: Optional[str] = None, price: Optional[float] = None) -> int:
+    """Publica un nuevo servicio."""
     conn = get_conn()
     cur = conn.cursor()
-    created_at = datetime.utcnow().isoformat()
-    cur.execute(
-        "INSERT INTO services (user_id, category, service, comunas, price, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-        (user_id, category, service, comunas, price, created_at)
-    )
+    created = datetime.utcnow().isoformat()
+
+    cur.execute("""
+        INSERT INTO services (user_id, category, service, comunas, price, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (user_id, category, service, comunas, price, created))
+
     conn.commit()
     sid = cur.lastrowid
     conn.close()
     return sid
 
+
 def get_user_services(user_id: int) -> List[Dict]:
-    if not user_id:
-        return []
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("SELECT * FROM services WHERE user_id = ? ORDER BY id DESC", (user_id,))
@@ -200,18 +220,23 @@ def get_user_services(user_id: int) -> List[Dict]:
     conn.close()
     return [dict(r) for r in rows]
 
-def get_services_filtered(term: str, comuna: Optional[str]=None) -> List[Dict]:
+
+def get_services_filtered(term: str, comuna: Optional[str] = None) -> List[Dict]:
+    """
+    (EN PRESENTACIÓN)
+    Esta consulta une tabla de servicios con la tabla de usuarios
+    para mostrar nombre, bio y comuna del proveedor.
+    """
     conn = get_conn()
     cur = conn.cursor()
+
     term_like = f"%{term}%"
+
     if comuna:
         comuna_like = f"%{comuna}%"
         cur.execute("""
-            SELECT s.*, 
-                   u.nombre as user_nombre, 
-                   u.comuna as user_comuna, 
-                   u.bio as user_bio,
-                   s.user_id as user_id
+            SELECT s.*, u.nombre AS user_nombre, u.comuna AS user_comuna,
+                   u.bio AS user_bio, s.user_id AS user_id
             FROM services s
             JOIN users u ON s.user_id = u.id
             WHERE (LOWER(s.service) LIKE LOWER(?) OR LOWER(s.category) LIKE LOWER(?))
@@ -220,375 +245,370 @@ def get_services_filtered(term: str, comuna: Optional[str]=None) -> List[Dict]:
         """, (term_like, term_like, comuna_like, comuna_like))
     else:
         cur.execute("""
-            SELECT s.*, 
-                   u.nombre as user_nombre, 
-                   u.comuna as user_comuna, 
-                   u.bio as user_bio,
-                   s.user_id as user_id
+            SELECT s.*, u.nombre AS user_nombre, u.comuna AS user_comuna,
+                   u.bio AS user_bio, s.user_id AS user_id
             FROM services s
             JOIN users u ON s.user_id = u.id
             WHERE (LOWER(s.service) LIKE LOWER(?) OR LOWER(s.category) LIKE LOWER(?))
             ORDER BY s.id DESC
         """, (term_like, term_like))
+
     rows = cur.fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
-# ============ MESSAGES ============
 
+# ================================================================
+# MENSAJES (CHAT)
+# ================================================================
 def add_message(emisor_id: int, receptor_id: int, contenido: str):
-    if not emisor_id or not receptor_id:
-        return
+    """Guarda un mensaje nuevo."""
     conn = get_conn()
     cur = conn.cursor()
     timestamp = datetime.utcnow().isoformat()
-    cur.execute("INSERT INTO messages (emisor_id, receptor_id, contenido, timestamp) VALUES (?, ?, ?, ?)",
-                (emisor_id, receptor_id, contenido, timestamp))
+
+    cur.execute("""
+        INSERT INTO messages (emisor_id, receptor_id, contenido, timestamp)
+        VALUES (?, ?, ?, ?)
+    """, (emisor_id, receptor_id, contenido, timestamp))
+
     conn.commit()
     conn.close()
 
+
 def get_messages_between(user_a: int, user_b: int) -> List[Dict]:
-    if not user_a or not user_b:
-        return []
+    """Obtiene el historial entre dos usuarios."""
     conn = get_conn()
     cur = conn.cursor()
+
     cur.execute("""
         SELECT * FROM messages
-        WHERE (emisor_id = ? AND receptor_id = ?) OR (emisor_id = ? AND receptor_id = ?)
+        WHERE (emisor_id = ? AND receptor_id = ?)
+           OR (emisor_id = ? AND receptor_id = ?)
         ORDER BY id ASC
     """, (user_a, user_b, user_b, user_a))
+
     rows = cur.fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
+
 def get_recent_chats(user_id: int) -> List[Dict]:
-    if not user_id:
-        return []
+    """
+    (EN PRESENTACIÓN)
+    Devuelve una lista de conversaciones recientes,
+    cada una con:
+      - nombre del otro usuario
+      - último mensaje
+      - hora
+    """
     conn = get_conn()
     cur = conn.cursor()
-    
+
     cur.execute("""
-        SELECT 
-            m.id,
-            m.emisor_id,
-            m.receptor_id,
-            m.contenido,
-            m.timestamp
-        FROM messages m
-        WHERE m.emisor_id = ? OR m.receptor_id = ?
-        ORDER BY m.timestamp DESC
+        SELECT id, emisor_id, receptor_id, contenido, timestamp
+        FROM messages
+        WHERE emisor_id = ? OR receptor_id = ?
+        ORDER BY timestamp DESC
     """, (user_id, user_id))
-    
+
     messages = cur.fetchall()
-    
-    chats_dict = {}
+
+    chats = {}
     for msg in messages:
         msg = dict(msg)
-        other_user_id = msg['receptor_id'] if msg['emisor_id'] == user_id else msg['emisor_id']
-        
-        if other_user_id not in chats_dict:
-            chats_dict[other_user_id] = {
-                'other_user_id': other_user_id,
-                'last_message': msg['contenido'],
-                'last_timestamp': msg['timestamp']
+        other = msg["receptor_id"] if msg["emisor_id"] == user_id else msg["emisor_id"]
+
+        if other not in chats:
+            chats[other] = {
+                "other_user_id": other,
+                "last_message": msg["contenido"],
+                "last_timestamp": msg["timestamp"]
             }
-    
+
     result = []
-    for other_id, chat_data in chats_dict.items():
-        cur.execute("SELECT nombre FROM users WHERE id = ?", (other_id,))
-        user_row = cur.fetchone()
-        if user_row:
-            chat_data['other_user_name'] = user_row['nombre']
-            result.append(chat_data)
-    
+    for oid, chat in chats.items():
+        cur.execute("SELECT nombre FROM users WHERE id = ?", (oid,))
+        name = cur.fetchone()
+        if name:
+            chat["other_user_name"] = name["nombre"]
+            result.append(chat)
+
     conn.close()
     return result
 
-# ============ NOTIFICATIONS ============
 
+# ================================================================
+# NOTIFICACIONES
+# ================================================================
 def add_notification(usuario_id: int, tipo: str, mensaje: str):
-    if not usuario_id:
-        return
+    """Crea una notificación para un usuario."""
     conn = get_conn()
     cur = conn.cursor()
     fecha = datetime.utcnow().isoformat()
-    cur.execute("INSERT INTO notifications (usuario_id, tipo, mensaje, fecha, leido) VALUES (?, ?, ?, ?, ?)",
-                (usuario_id, tipo, mensaje, fecha, 0))
+
+    cur.execute("""
+        INSERT INTO notifications (usuario_id, tipo, mensaje, fecha, leido)
+        VALUES (?, ?, ?, ?, 0)
+    """, (usuario_id, tipo, mensaje, fecha))
+
     conn.commit()
     conn.close()
 
-def get_notifications(usuario_id: int, only_unread: bool=False):
-    if not usuario_id:
-        return []
+
+def get_notifications(usuario_id: int, only_unread=False):
+    """Obtiene notificaciones de un usuario."""
     conn = get_conn()
     cur = conn.cursor()
+
     if only_unread:
-        cur.execute("SELECT * FROM notifications WHERE usuario_id = ? AND leido = 0 ORDER BY id DESC", (usuario_id,))
+        cur.execute("""
+            SELECT * FROM notifications
+            WHERE usuario_id = ? AND leido = 0
+            ORDER BY id DESC
+        """, (usuario_id,))
     else:
-        cur.execute("SELECT * FROM notifications WHERE usuario_id = ? ORDER BY id DESC", (usuario_id,))
+        cur.execute("""
+            SELECT * FROM notifications
+            WHERE usuario_id = ?
+            ORDER BY id DESC
+        """, (usuario_id,))
+
     rows = cur.fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
+
 def mark_notification_read(notification_id: int):
+    """Marca una notificación como leída."""
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("UPDATE notifications SET leido = 1 WHERE id = ?", (notification_id,))
     conn.commit()
     conn.close()
 
-# ============ TRABAJOS ============
 
-def create_trabajo(service_id: int, cliente_id: int, trabajador_id: int, 
-                   fecha_solicitada: str, hora_solicitada: str, direccion: str, 
-                   descripcion: str, precio_propuesto: Optional[float] = None) -> int:
+# ================================================================
+# TRABAJOS (SOLICITUDES)
+# ================================================================
+def create_trabajo(service_id: int, cliente_id: int, trabajador_id: int,
+                   fecha_solicitada: str, hora_solicitada: str,
+                   direccion: str, descripcion: str,
+                   precio_propuesto: Optional[float]) -> int:
+    """Crea un nuevo trabajo pendiente."""
     conn = get_conn()
     cur = conn.cursor()
-    fecha_creacion = datetime.utcnow().isoformat()
+    created = datetime.utcnow().isoformat()
+
     cur.execute("""
-        INSERT INTO trabajos (service_id, cliente_id, trabajador_id, estado, 
-                             fecha_solicitada, hora_solicitada, direccion, descripcion, 
-                             precio_propuesto, fecha_creacion)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (service_id, cliente_id, trabajador_id, "pendiente", 
-          fecha_solicitada, hora_solicitada, direccion, descripcion, 
-          precio_propuesto, fecha_creacion))
+        INSERT INTO trabajos (
+            service_id, cliente_id, trabajador_id, estado,
+            fecha_solicitada, hora_solicitada, direccion, descripcion,
+            precio_propuesto, fecha_creacion
+        )
+        VALUES (?, ?, ?, 'pendiente', ?, ?, ?, ?, ?, ?)
+    """, (service_id, cliente_id, trabajador_id,
+          fecha_solicitada, hora_solicitada, direccion, descripcion,
+          precio_propuesto, created))
+
     conn.commit()
-    trabajo_id = cur.lastrowid
+    tid = cur.lastrowid
     conn.close()
-    return trabajo_id
+    return tid
 
-def get_trabajo_by_id(trabajo_id: int) -> Optional[Dict]:
+
+def get_trabajo_by_id(trabajo_id: int):
+    """Obtiene información completa de un trabajo."""
     conn = get_conn()
     cur = conn.cursor()
+
     cur.execute("""
-        SELECT t.*, 
-               s.service as servicio_nombre,
-               s.category as servicio_categoria,
-               c.nombre as cliente_nombre,
-               c.email as cliente_email,
-               tr.nombre as trabajador_nombre,
-               tr.email as trabajador_email
+        SELECT t.*,
+               s.service AS servicio_nombre,
+               c.nombre AS cliente_nombre,
+               tr.nombre AS trabajador_nombre
         FROM trabajos t
         JOIN services s ON t.service_id = s.id
         JOIN users c ON t.cliente_id = c.id
         JOIN users tr ON t.trabajador_id = tr.id
         WHERE t.id = ?
     """, (trabajo_id,))
+
     row = cur.fetchone()
     conn.close()
     return dict(row) if row else None
 
+
 def get_trabajos_cliente(cliente_id: int) -> List[Dict]:
+    """Muestra los trabajos solicitados por un cliente."""
     conn = get_conn()
     cur = conn.cursor()
+
     cur.execute("""
-        SELECT t.*, 
-               s.service as servicio_nombre,
-               tr.nombre as trabajador_nombre
+        SELECT t.*, s.service AS servicio_nombre, u.nombre AS trabajador_nombre
         FROM trabajos t
         JOIN services s ON t.service_id = s.id
-        JOIN users tr ON t.trabajador_id = tr.id
+        JOIN users u ON t.trabajador_id = u.id
         WHERE t.cliente_id = ?
-        ORDER BY t.fecha_creacion DESC
+        ORDER BY fecha_creacion DESC
     """, (cliente_id,))
+
     rows = cur.fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
 
 def get_trabajos_trabajador(trabajador_id: int) -> List[Dict]:
+    """Muestra los trabajos que recibió el trabajador."""
     conn = get_conn()
     cur = conn.cursor()
+
     cur.execute("""
-        SELECT t.*, 
-               s.service as servicio_nombre,
-               c.nombre as cliente_nombre
+        SELECT t.*, s.service AS servicio_nombre, u.nombre AS cliente_nombre
         FROM trabajos t
         JOIN services s ON t.service_id = s.id
-        JOIN users c ON t.cliente_id = c.id
+        JOIN users u ON t.cliente_id = u.id
         WHERE t.trabajador_id = ?
-        ORDER BY t.fecha_creacion DESC
+        ORDER BY fecha_creacion DESC
     """, (trabajador_id,))
+
     rows = cur.fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
-def update_trabajo_estado(trabajo_id: int, nuevo_estado: str, 
+
+def update_trabajo_estado(trabajo_id: int, nuevo_estado: str,
                           precio_final: Optional[float] = None,
                           comentario_trabajador: Optional[str] = None):
+    """Actualiza el estado del trabajo (aceptado, completado, etc)."""
     conn = get_conn()
     cur = conn.cursor()
-    
+
     if nuevo_estado == "aceptado":
-        fecha_aceptacion = datetime.utcnow().isoformat()
-        cur.execute("UPDATE trabajos SET estado = ?, fecha_aceptacion = ? WHERE id = ?",
-                   (nuevo_estado, fecha_aceptacion, trabajo_id))
+        cur.execute("""
+            UPDATE trabajos
+            SET estado = ?, fecha_aceptacion = ?
+            WHERE id = ?
+        """, (nuevo_estado, datetime.utcnow().isoformat(), trabajo_id))
+
     elif nuevo_estado == "completado":
-        fecha_completado = datetime.utcnow().isoformat()
-        if precio_final is not None:
-            cur.execute("""UPDATE trabajos SET estado = ?, fecha_completado = ?, 
-                          precio_final = ?, comentario_trabajador = ? WHERE id = ?""",
-                       (nuevo_estado, fecha_completado, precio_final, comentario_trabajador, trabajo_id))
-        else:
-            cur.execute("""UPDATE trabajos SET estado = ?, fecha_completado = ?, 
-                          comentario_trabajador = ? WHERE id = ?""",
-                       (nuevo_estado, fecha_completado, comentario_trabajador, trabajo_id))
+        cur.execute("""
+            UPDATE trabajos
+            SET estado = ?, fecha_completado = ?, precio_final = ?, comentario_trabajador = ?
+            WHERE id = ?
+        """, (nuevo_estado, datetime.utcnow().isoformat(),
+              precio_final, comentario_trabajador, trabajo_id))
+
     else:
         cur.execute("UPDATE trabajos SET estado = ? WHERE id = ?", (nuevo_estado, trabajo_id))
-    
+
     conn.commit()
     conn.close()
 
-# ============ EVALUACIONES ============
 
+# ================================================================
+# EVALUACIONES
+# ================================================================
 def create_evaluacion(trabajo_id: int, cliente_id: int, trabajador_id: int,
-                     calificacion: int, comentario: str,
-                     puntualidad: int, calidad: int, comunicacion: int,
-                     recomendaria: int) -> int:
+                      calificacion: int, comentario: str,
+                      puntualidad: int, calidad: int,
+                      comunicacion: int, recomendaria: int):
+    """Guarda la evaluación de un trabajo."""
     conn = get_conn()
     cur = conn.cursor()
     fecha = datetime.utcnow().isoformat()
+
     cur.execute("""
-        INSERT INTO evaluaciones (trabajo_id, cliente_id, trabajador_id, calificacion,
-                                 comentario, puntualidad, calidad, comunicacion,
-                                 recomendaria, fecha)
+        INSERT INTO evaluaciones (
+            trabajo_id, cliente_id, trabajador_id, calificacion,
+            comentario, puntualidad, calidad, comunicacion,
+            recomendaria, fecha
+        )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (trabajo_id, cliente_id, trabajador_id, calificacion, comentario,
-          puntualidad, calidad, comunicacion, recomendaria, fecha))
-    conn.commit()
-    eval_id = cur.lastrowid
-    
-    cur.execute("UPDATE trabajos SET estado = ? WHERE id = ?", ("evaluado", trabajo_id))
+    """, (trabajo_id, cliente_id, trabajador_id, calificacion,
+          comentario, puntualidad, calidad, comunicacion,
+          recomendaria, fecha))
+
+    # Cambiar estado del trabajo
+    cur.execute("UPDATE trabajos SET estado = 'evaluado' WHERE id = ?", (trabajo_id,))
+
     conn.commit()
     conn.close()
-    return eval_id
+
 
 def get_evaluaciones_trabajador(trabajador_id: int) -> List[Dict]:
-    """Obtener todas las evaluaciones de un trabajador"""
-    if not trabajador_id:
-        return []
-    
+    """Devuelve todas las evaluaciones hechas a un trabajador."""
     conn = get_conn()
     cur = conn.cursor()
-    
-    try:
-        # Consulta simplificada y más robusta
-        cur.execute("""
-            SELECT 
-                e.id,
-                e.trabajo_id,
-                e.cliente_id,
-                e.trabajador_id,
-                e.calificacion,
-                e.comentario,
-                e.puntualidad,
-                e.calidad,
-                e.comunicacion,
-                e.recomendaria,
-                e.fecha,
-                c.nombre as cliente_nombre,
-                s.service as servicio_nombre
-            FROM evaluaciones e
-            INNER JOIN users c ON e.cliente_id = c.id
-            INNER JOIN trabajos tr ON e.trabajo_id = tr.id
-            INNER JOIN services s ON tr.service_id = s.id
-            WHERE e.trabajador_id = ?
-            ORDER BY e.fecha DESC
-        """, (trabajador_id,))
-        
-        rows = cur.fetchall()
-        result = [dict(r) for r in rows]
-        
-    except Exception as e:
-        print(f"Error en get_evaluaciones_trabajador: {e}")
-        result = []
-    finally:
-        conn.close()
-    
-    return result
+
+    cur.execute("""
+        SELECT e.*, u.nombre AS cliente_nombre, s.service AS servicio_nombre
+        FROM evaluaciones e
+        JOIN users u ON e.cliente_id = u.id
+        JOIN trabajos t ON e.trabajo_id = t.id
+        JOIN services s ON t.service_id = s.id
+        WHERE e.trabajador_id = ?
+        ORDER BY e.fecha DESC
+    """, (trabajador_id,))
+
+    rows = cur.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
 
 
 def get_promedio_calificacion(trabajador_id: int) -> float:
+    """Promedio general del trabajador."""
     conn = get_conn()
     cur = conn.cursor()
+
     cur.execute("""
-        SELECT AVG(calificacion) as promedio
+        SELECT AVG(calificacion) AS promedio
         FROM evaluaciones
         WHERE trabajador_id = ?
     """, (trabajador_id,))
+
     row = cur.fetchone()
     conn.close()
-    return round(row['promedio'], 1) if row and row['promedio'] else 0.0
+    return round(row["promedio"], 1) if row and row["promedio"] else 0.0
+
 
 def get_estadisticas_trabajador(trabajador_id: int) -> Dict:
+    """Devuelve resumen estadístico del trabajador."""
     conn = get_conn()
     cur = conn.cursor()
-    
-    cur.execute("SELECT COUNT(*) as total FROM trabajos WHERE trabajador_id = ? AND estado IN ('completado', 'evaluado')",
-               (trabajador_id,))
-    completados = cur.fetchone()['total']
-    
-    cur.execute("SELECT COUNT(*) as total FROM evaluaciones WHERE trabajador_id = ?", (trabajador_id,))
-    evaluaciones = cur.fetchone()['total']
-    
-    promedio = get_promedio_calificacion(trabajador_id)
-    
+
     cur.execute("""
-        SELECT AVG(puntualidad) as puntualidad,
-               AVG(calidad) as calidad,
-               AVG(comunicacion) as comunicacion,
-               SUM(recomendaria) as recomendaciones
+        SELECT COUNT(*) AS total
+        FROM trabajos
+        WHERE trabajador_id = ? AND estado IN ('completado','evaluado')
+    """, (trabajador_id,))
+    completados = cur.fetchone()["total"]
+
+    cur.execute("""
+        SELECT COUNT(*) AS total
         FROM evaluaciones
         WHERE trabajador_id = ?
     """, (trabajador_id,))
-    promedios = cur.fetchone()
-    
-    conn.close()
-    
-    return {
-        'trabajos_completados': completados,
-        'total_evaluaciones': evaluaciones,
-        'promedio_general': promedio,
-        'puntualidad': round(promedios['puntualidad'], 1) if promedios['puntualidad'] else 0,
-        'calidad': round(promedios['calidad'], 1) if promedios['calidad'] else 0,
-        'comunicacion': round(promedios['comunicacion'], 1) if promedios['comunicacion'] else 0,
-        'recomendaciones': promedios['recomendaciones'] or 0
-    }
+    evaluaciones = cur.fetchone()["total"]
 
-# ============ FOTOS DE TRABAJOS ============
+    promedio = get_promedio_calificacion(trabajador_id)
 
-def add_foto_trabajo(trabajo_id: int, foto_base64: str, descripcion: Optional[str] = None):
-    conn = get_conn()
-    cur = conn.cursor()
-    fecha = datetime.utcnow().isoformat()
-    cur.execute("INSERT INTO fotos_trabajos (trabajo_id, foto_base64, descripcion, fecha) VALUES (?, ?, ?, ?)",
-               (trabajo_id, foto_base64, descripcion, fecha))
-    conn.commit()
-    conn.close()
-
-def get_fotos_trabajo(trabajo_id: int) -> List[Dict]:
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM fotos_trabajos WHERE trabajo_id = ? ORDER BY fecha", (trabajo_id,))
-    rows = cur.fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
-
-def get_fotos_trabajador(trabajador_id: int, limit: int = 10) -> List[Dict]:
-    conn = get_conn()
-    cur = conn.cursor()
     cur.execute("""
-        SELECT f.*, t.servicio_nombre
-        FROM fotos_trabajos f
-        JOIN (
-            SELECT tr.id, s.service as servicio_nombre
-            FROM trabajos tr
-            JOIN services s ON tr.service_id = s.id
-            WHERE tr.trabajador_id = ?
-        ) t ON f.trabajo_id = t.id
-        ORDER BY f.fecha DESC
-        LIMIT ?
-    """, (trabajador_id, limit))
-    rows = cur.fetchall()
+        SELECT AVG(puntualidad) AS p, AVG(calidad) AS c,
+               AVG(comunicacion) AS co, SUM(recomendaria) AS r
+        FROM evaluaciones
+        WHERE trabajador_id = ?
+    """, (trabajador_id,))
+
+    stats = cur.fetchone()
     conn.close()
-    return [dict(r) for r in rows]
+
+    return {
+        "trabajos_completados": completados,
+        "total_evaluaciones": evaluaciones,
+        "promedio_general": promedio,
+        "puntualidad": round(stats["p"], 1) if stats["p"] else 0,
+        "calidad": round(stats["c"], 1) if stats["c"] else 0,
+        "comunicacion": round(stats["co"], 1) if stats["co"] else 0,
+        "recomendaciones": stats["r"] or 0
+    }
